@@ -13,6 +13,7 @@ from Bio.PDB.Polypeptide import is_aa, protein_letters_3to1_extended
 UNKNOWN_RESIDUE = "X"
 WATER_NAMES = frozenset({"HOH", "WAT", "DOD"})
 BACKBONE_ATOMS = frozenset({"N", "CA", "C"})
+BACKBONE_TRACE_ATOMS = frozenset({"CA", "P"})
 
 
 class StructureParseError(ValueError):
@@ -113,6 +114,32 @@ def _protein_residues(chain: Any) -> tuple[list[Any], int]:
     runs = sum(_is_polymer_residue(peptide[0]) for peptide in peptides)
     isolated = sum(res.id not in linked for res in residues)
     return residues, runs + isolated
+
+
+def backbone_trace_mmcif(mmcif_text: str) -> str:
+    """A minimal mmCIF holding only the CA (protein) and P (nucleic acid) atom rows.
+
+    A cartoon only needs the backbone trace and the viewer only needs the atom_site
+    loop, so for huge entries this shrinks what is embedded in the browser iframe by
+    well over an order of magnitude. It works on the text instead of re-parsing,
+    which would double the cost on big files.
+    """
+    lines = mmcif_text.splitlines()
+    try:
+        first = next(i for i, line in enumerate(lines) if line.startswith("_atom_site."))
+    except StopIteration:
+        raise StructureParseError("mmCIF data has no atom_site loop.") from None
+    rows_start = next(i for i in range(first, len(lines)) if not lines[i].startswith("_"))
+    header = lines[first:rows_start]
+    name_column = [line.split()[0] for line in header].index("_atom_site.label_atom_id")
+
+    trace = ["data_trace", "loop_", *header]
+    for line in lines[rows_start:]:
+        if line.startswith(("#", "loop_", "_")):
+            break
+        if line.split()[name_column].strip("\"'") in BACKBONE_TRACE_ATOMS:
+            trace.append(line)
+    return "\n".join([*trace, "#"]) + "\n"
 
 
 def parse_structure(mmcif_text: str, pdb_id: str = "") -> ParsedStructure:
