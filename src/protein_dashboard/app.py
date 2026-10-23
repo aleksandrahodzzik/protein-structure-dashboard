@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from datetime import timedelta
 
 import streamlit as st
@@ -110,7 +111,11 @@ def render_search_results(query: str, ids: list[str]) -> None:
             title = load_entry(pdb_id, with_organisms=False).title
         except RcsbError:
             title = ""
-        label = f"{pdb_id} · {title.title()[:48]}" if title else pdb_id
+        label = (
+            f"{pdb_id} · {textwrap.shorten(title.title(), 60, placeholder='…')}"
+            if title
+            else pdb_id
+        )
         st.button(label, key=f"hit_{pdb_id}", on_click=select_entry, args=(pdb_id,))
 
 
@@ -124,7 +129,7 @@ def render_landing() -> None:
         "start with an example:"
     )
     for column, (pdb_id, name, blurb) in zip(st.columns(len(EXAMPLES)), EXAMPLES, strict=True):
-        with column, st.container(border=True):
+        with column, st.container(border=True, height=170):
             st.markdown(f"**{name}**")
             st.caption(blurb)
             st.button(pdb_id, key=f"example_{pdb_id}", on_click=select_entry, args=(pdb_id,))
