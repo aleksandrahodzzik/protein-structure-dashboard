@@ -86,8 +86,12 @@ class RcsbClient:
         self._backoff = backoff_seconds
         self._sleep = sleep
 
-    def fetch_entry(self, pdb_id: str) -> EntryMetadata:
-        """Entry-level metadata plus the organism(s) of the first polymer entities."""
+    def fetch_entry(self, pdb_id: str, *, with_organisms: bool = True) -> EntryMetadata:
+        """Entry-level metadata plus the organism(s) of the first polymer entities.
+
+        ``with_organisms=False`` skips the extra per-entity requests, which is enough
+        when only titles are needed (e.g. listing search results).
+        """
         pdb_id = normalise_pdb_id(pdb_id)
         entry = self._get_json(f"{DATA_API}/entry/{pdb_id}", pdb_id)
         info = entry.get("rcsb_entry_info", {})
@@ -98,7 +102,11 @@ class RcsbClient:
             title=entry.get("struct", {}).get("title", "").strip(),
             method=(entry.get("exptl") or [{}])[0].get("method", "Unknown"),
             resolution=float(resolutions[0]) if resolutions else None,
-            organisms=self._fetch_organisms(pdb_id, entity_ids[:MAX_ORGANISM_ENTITIES]),
+            organisms=(
+                self._fetch_organisms(pdb_id, entity_ids[:MAX_ORGANISM_ENTITIES])
+                if with_organisms
+                else ()
+            ),
             deposition_date=entry.get("rcsb_accession_info", {}).get("deposit_date", "")[:10],
             atom_count=info.get("deposited_atom_count"),
         )

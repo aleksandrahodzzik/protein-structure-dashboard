@@ -67,6 +67,16 @@ def test_fetch_entry_success_maps_fields(client: RcsbClient) -> None:
 
 
 @responses.activate
+def test_fetch_entry_can_skip_organism_lookups(client: RcsbClient) -> None:
+    responses.get(ENTRY_URL, json=ENTRY_JSON)
+
+    entry = client.fetch_entry("1UBQ", with_organisms=False)
+
+    assert entry.organisms == ()
+    assert len(responses.calls) == 1
+
+
+@responses.activate
 def test_requests_send_a_user_agent_and_timeout(client: RcsbClient) -> None:
     responses.get(ENTRY_URL, json=ENTRY_JSON)
     responses.get(ENTITY_URL, json=ENTITY_JSON)

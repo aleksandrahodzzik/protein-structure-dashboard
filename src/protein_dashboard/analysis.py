@@ -42,6 +42,8 @@ PROPERTY_CLASSES: dict[str, str] = {
 }
 
 # Window 19 with a 1.6 cut-off is the classic Kyte-Doolittle transmembrane-helix heuristic.
+MIN_WINDOW = 3
+MAX_WINDOW = 39
 DEFAULT_WINDOW = 9
 TM_WINDOW = 19
 TM_THRESHOLD = 1.6
@@ -129,6 +131,14 @@ def kd_profile(sequence: str, window: int = DEFAULT_WINDOW) -> HydrophobicityPro
         positions=[i + half + 1 for i in range(len(values))],
         values=values,
     )
+
+
+def max_window(length: int) -> int:
+    """Largest valid (odd) window for a sequence of ``length`` residues, 0 if none fits."""
+    limit = min(length, MAX_WINDOW)
+    if limit % 2 == 0:
+        limit -= 1
+    return limit if limit >= MIN_WINDOW else 0
 
 
 def compute_metrics(sequence: str) -> ProteinMetrics:

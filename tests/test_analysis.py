@@ -85,6 +85,14 @@ def test_kd_profile_rejects_window_longer_than_sequence() -> None:
         analysis.kd_profile("MKV", 9)
 
 
+@pytest.mark.parametrize(
+    ("length", "expected"),
+    [(0, 0), (2, 0), (3, 3), (4, 3), (8, 7), (19, 19), (38, 37), (39, 39), (5000, 39)],
+)
+def test_max_window_is_the_largest_odd_window_that_fits(length: int, expected: int) -> None:
+    assert analysis.max_window(length) == expected
+
+
 def test_unknown_and_lowercase_characters_are_excluded_and_counted() -> None:
     cleaned = analysis.clean_sequence(" mk\nVX*BZ-U ")
     assert cleaned.sequence == "MKV"

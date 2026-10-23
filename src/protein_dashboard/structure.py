@@ -10,10 +10,16 @@ from typing import Any
 from Bio.PDB import MMCIFParser, PPBuilder
 from Bio.PDB.Polypeptide import is_aa, protein_letters_3to1_extended
 
+from .analysis import STANDARD_AMINO_ACIDS
+
 UNKNOWN_RESIDUE = "X"
 WATER_NAMES = frozenset({"HOH", "WAT", "DOD"})
 BACKBONE_ATOMS = frozenset({"N", "CA", "C"})
-BACKBONE_TRACE_ATOMS = frozenset({"CA", "P"})
+# What a 3Dmol cartoon needs: the protein backbone (CA alone draws nothing) and the
+# sugar-phosphate backbone of nucleic acids.
+CARTOON_ATOMS = frozenset({"N", "CA", "C", "O", "P", "O5'", "C5'", "C4'", "C3'", "O3'"})
+# Categories kept in backbone-only mode so helices and sheets are still drawn as such.
+SECONDARY_STRUCTURE_CATEGORIES = frozenset({"_struct_conf", "_struct_sheet_range"})
 
 
 class StructureParseError(ValueError):
@@ -78,9 +84,12 @@ def residue_letter(resname: str) -> str:
 
     Modified residues map to their parent amino acid (MSE selenomethionine -> M,
     SEP phosphoserine -> S, ...) using Biopython's table; anything it does not
-    know (including UNK) becomes X rather than a guess.
+    know (including UNK) becomes X rather than a guess. Letters outside the 20
+    standard amino acids also become X, so the sequence and the analysis module
+    always agree on which residues are usable.
     """
-    return protein_letters_3to1_extended.get(resname.strip().upper(), UNKNOWN_RESIDUE)
+    letter = protein_letters_3to1_extended.get(resname.strip().upper(), UNKNOWN_RESIDUE)
+    return letter if letter in STANDARD_AMINO_ACIDS else UNKNOWN_RESIDUE
 
 
 def _is_polymer_residue(residue: Any) -> bool:
@@ -116,30 +125,71 @@ def _protein_residues(chain: Any) -> tuple[list[Any], int]:
     return residues, runs + isolated
 
 
-def backbone_trace_mmcif(mmcif_text: str) -> str:
-    """A minimal mmCIF holding only the CA (protein) and P (nucleic acid) atom rows.
+def trim_mmcif(mmcif_text: str, *, backbone_only: bool = False) -> str:
+    """Rewrite the mmCIF so the viewer draws what the analysis analysed.
 
-    A cartoon only needs the backbone trace and the viewer only needs the atom_site
-    loop, so for huge entries this shrinks what is embedded in the browser iframe by
-    well over an order of magnitude. It works on the text instead of re-parsing,
-    which would double the cost on big files.
+    Only the first model is kept (an NMR ensemble would otherwise be drawn as ten
+    overlapping copies). With ``backbone_only`` just the atoms a cartoon needs and the
+    helix/sheet records are kept, which shrinks huge entries by an order of magnitude.
+    Works on the text instead of re-parsing, which would double the cost on big files.
     """
-    lines = mmcif_text.splitlines()
-    try:
-        first = next(i for i, line in enumerate(lines) if line.startswith("_atom_site."))
-    except StopIteration:
-        raise StructureParseError("mmCIF data has no atom_site loop.") from None
-    rows_start = next(i for i in range(first, len(lines)) if not lines[i].startswith("_"))
-    header = lines[first:rows_start]
-    name_column = [line.split()[0] for line in header].index("_atom_site.label_atom_id")
+    blocks = _category_blocks(mmcif_text)
+    trimmed: list[list[str]] = []
+    found_atoms = False
+    for block in blocks:
+        category = _block_category(block)
+        if category == "_atom_site":
+            found_atoms = True
+            block = _filter_atom_rows(block, backbone_only)
+        elif backbone_only and category not in SECONDARY_STRUCTURE_CATEGORIES | {None}:
+            continue
+        trimmed.append(block)
+    if not found_atoms:
+        raise StructureParseError("mmCIF data has no atom_site loop.")
+    return "\n#\n".join("\n".join(block) for block in trimmed) + "\n#\n"
 
-    trace = ["data_trace", "loop_", *header]
-    for line in lines[rows_start:]:
-        if line.startswith(("#", "loop_", "_")):
-            break
-        if line.split()[name_column].strip("\"'") in BACKBONE_TRACE_ATOMS:
-            trace.append(line)
-    return "\n".join([*trace, "#"]) + "\n"
+
+def _category_blocks(mmcif_text: str) -> list[list[str]]:
+    """Split on the '#' separator lines RCSB writes between mmCIF categories."""
+    blocks: list[list[str]] = [[]]
+    for line in mmcif_text.splitlines():
+        if line.startswith("#"):
+            blocks.append([])
+        else:
+            blocks[-1].append(line)
+    return [block for block in blocks if block]
+
+
+def _block_category(block: list[str]) -> str | None:
+    """'_atom_site' for a block of _atom_site.* items; None for the data_ header."""
+    for line in block:
+        if line.startswith("_"):
+            return line.split(".")[0].split()[0]
+    return None
+
+
+def _filter_atom_rows(block: list[str], backbone_only: bool) -> list[str]:
+    first_item = next(i for i, line in enumerate(block) if line.startswith("_"))
+    header_end = next(i for i in range(first_item, len(block)) if not block[i].startswith("_"))
+    columns = [line.split()[0] for line in block[first_item:header_end]]
+    name_column = columns.index("_atom_site.label_atom_id")
+    residue_column = columns.index("_atom_site.label_comp_id")
+    model_column = columns.index("_atom_site.pdbx_PDB_model_num")
+
+    kept = block[:header_end]
+    first_model: str | None = None
+    for row in block[header_end:]:
+        tokens = row.split()
+        first_model = first_model or tokens[model_column]
+        if tokens[model_column] != first_model:
+            continue
+        if backbone_only and (
+            tokens[name_column].strip("\"'") not in CARTOON_ATOMS
+            or tokens[residue_column] in WATER_NAMES  # water oxygens are also named "O"
+        ):
+            continue
+        kept.append(row)
+    return kept
 
 
 def parse_structure(mmcif_text: str, pdb_id: str = "") -> ParsedStructure:

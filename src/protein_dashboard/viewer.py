@@ -9,7 +9,7 @@ import py3Dmol
 import streamlit.components.v1 as components
 
 from .analysis import residue_kd_value
-from .structure import ParsedStructure, backbone_trace_mmcif
+from .structure import ParsedStructure, trim_mmcif
 
 # Above this many atoms the view drops surface and ligands and loads only the backbone
 # trace; browsers choke on full-atom ribosome-sized entries.
@@ -83,20 +83,24 @@ def build_view(
 ) -> py3Dmol.view:
     heavy = is_heavy(structure)
     view = py3Dmol.view(width="100%", height=height)
-    view.addModel(backbone_trace_mmcif(mmcif_text) if heavy else mmcif_text, "cif")
+    view.addModel(trim_mmcif(mmcif_text, backbone_only=heavy), "cif")
 
     colours = _colour_style(options, structure)
     view.setStyle({}, {"cartoon": colours})
 
     others = [c.chain_id for c in structure.chains if c.chain_id != options.focus_chain]
-    if options.focus_chain and others:
+    # With dozens of chains (ribosomes) dimming all but one would leave almost nothing visible.
+    if options.focus_chain and others and not heavy:
         view.setStyle({"chain": others}, {"cartoon": {**colours, "opacity": DIMMED_OPACITY}})
 
     ligand_names = sorted({name for c in structure.chains for name in c.ligand_names})
     if options.show_ligands and ligand_names and not heavy:
         view.addStyle(
             {"resn": ligand_names},
-            {"stick": {"colorscheme": "greenCarbon", "radius": 0.25}, "sphere": {"scale": 0.3}},
+            {
+                "stick": {"colorscheme": "greenCarbon", "radius": 0.25},
+                "sphere": {"colorscheme": "greenCarbon", "scale": 0.3},
+            },
         )
 
     if options.show_surface and not heavy:

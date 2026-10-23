@@ -5,7 +5,12 @@ import pytest
 
 from helpers import build_mmcif, residue
 from protein_dashboard import viewer
-from protein_dashboard.structure import ParsedStructure, backbone_trace_mmcif, parse_structure
+from protein_dashboard.structure import (
+    ParsedStructure,
+    StructureParseError,
+    parse_structure,
+    trim_mmcif,
+)
 from protein_dashboard.viewer import ColorMode, ViewerOptions, build_view
 
 CIF = (Path(__file__).parent / "data" / "1UBQ.cif").read_text()
@@ -90,27 +95,59 @@ def test_focus_chain_dims_the_other_chains() -> None:
     assert '"opacity":0.25' in html.replace(" ", "")
 
 
-def test_heavy_structures_get_backbone_only_and_no_surface_or_ligands(
+def test_heavy_multi_chain_structures_are_not_dimmed() -> None:
+    mmcif = build_mmcif([residue("ALA", "A"), residue("GLY", "A"), residue("LYS", "B")])
+    heavy = replace(parse_structure(mmcif, "T"), atom_count=viewer.HEAVY_ATOM_THRESHOLD + 1)
+
+    html = html_for(heavy, ViewerOptions(focus_chain="A"), mmcif)
+
+    assert '"opacity":0.25' not in html.replace(" ", "")
+
+
+def test_heavy_structures_get_backbone_only_and_no_surface_or_ligands_or_dimming(
     ubiquitin: ParsedStructure,
 ) -> None:
     heavy = replace(ubiquitin, atom_count=viewer.HEAVY_ATOM_THRESHOLD + 1)
-    options = ViewerOptions(show_surface=True, show_ligands=True)
+    options = ViewerOptions(show_surface=True, show_ligands=True, focus_chain="A")
 
     html = html_for(heavy, options)
 
     assert viewer.is_heavy(heavy)
     assert not viewer.is_heavy(ubiquitin)
     assert "addSurface" not in html
-    assert len(html) < len(html_for(ubiquitin, options)) / 2
+    # Atom rows are embedded as one JS string, so rows are separated by a literal "\n".
+    assert html.count("\\nATOM ") == 76 * 4  # backbone atoms only
+    assert html_for(ubiquitin, options).count("\\nATOM ") == 602
 
 
-def test_backbone_trace_keeps_only_alpha_carbons_and_stays_parseable() -> None:
-    trimmed = backbone_trace_mmcif(CIF)
+def test_backbone_only_trim_keeps_cartoon_atoms_and_stays_parseable() -> None:
+    trimmed = trim_mmcif(CIF, backbone_only=True)
 
     parsed = parse_structure(trimmed, "1UBQ")
-    assert parsed.atom_count == 76
-    assert len(trimmed) < len(CIF) / 5
-    assert trimmed.count("\nATOM ") == 76
+    assert parsed.atom_count == 76 * 4  # N, CA, C, O per residue; side chains and waters gone
+    assert len(trimmed) < len(CIF) / 2
+    assert "_struct_conf." in trimmed  # helix/sheet records survive so the cartoon keeps its shape
+    assert "_citation." not in trimmed
+
+
+def test_trim_without_backbone_only_keeps_every_atom_of_the_first_model() -> None:
+    assert parse_structure(trim_mmcif(CIF), "1UBQ").atom_count == 660
+
+
+def test_trim_drops_later_models_of_an_nmr_ensemble() -> None:
+    ensemble = build_mmcif([residue("ALA"), residue("GLY")], models=3)
+    assert "_atom_site.pdbx_PDB_model_num" in ensemble
+
+    trimmed = trim_mmcif(ensemble)
+
+    assert trimmed.count("ATOM ") == 6  # 2 residues x 3 backbone atoms, model 1 only
+    assert " 2\n" not in trimmed.replace(" 2 ", "")  # no rows tagged with model 2 or 3
+    assert parse_structure(trimmed, "T").atom_count == 6
+
+
+def test_trim_rejects_text_without_atoms() -> None:
+    with pytest.raises(StructureParseError, match="atom_site"):
+        trim_mmcif("data_X\n#\n")
 
 
 def test_show_view_renders_through_components_html(

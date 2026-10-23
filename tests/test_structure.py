@@ -61,6 +61,13 @@ def test_residue_letter_mapping(resname: str, letter: str) -> None:
     assert structure.residue_letter(resname) == letter
 
 
+def test_residue_letter_always_returns_a_standard_letter_or_x() -> None:
+    from Bio.PDB.Polypeptide import protein_letters_3to1_extended
+
+    allowed = set(structure.STANDARD_AMINO_ACIDS) | {structure.UNKNOWN_RESIDUE}
+    assert {structure.residue_letter(name) for name in protein_letters_3to1_extended} <= allowed
+
+
 def test_modified_and_unknown_residues_stay_in_sequence_in_order() -> None:
     mmcif = build_mmcif(
         [
