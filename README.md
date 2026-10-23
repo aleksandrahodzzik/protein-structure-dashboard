@@ -8,7 +8,7 @@ A Streamlit dashboard that fetches any entry from the [RCSB Protein Data Bank](h
 
 ## Live demo
 
-**[Open the live demo](https://YOUR-APP-NAME.streamlit.app)** *(placeholder: replace this link after deploying, see the final steps in the project hand-off)*
+**[Open the live demo](https://protein-structure-dashboard.streamlit.app)**
 
 > The demo runs on Streamlit Community Cloud, which puts apps to sleep after a period of inactivity. If you see a "This app has gone to sleep" page, click the wake-up button and give it about 30 seconds.
 
