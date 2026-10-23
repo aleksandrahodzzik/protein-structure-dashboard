@@ -19,7 +19,16 @@ EXAMPLES = (
     ("4HHB", "Hemoglobin", "Multi-chain, heme ligands"),
     ("1BL8", "KcsA K+ channel", "Hydrophobic transmembrane region"),
     ("6VXX", "SARS-CoV-2 spike", "Large, three chains"),
+    ("1EMA", "Green fluorescent protein", "A beta-barrel that glows green"),
+    ("1F88", "Rhodopsin", "Vision receptor, seven helices"),
+    ("4OO8", "CRISPR-Cas9", "Genome editor, 1,300 residues"),
+    ("6LU7", "SARS-CoV-2 protease", "Main protease with an inhibitor"),
+    ("1TUP", "p53 on DNA", "Tumour suppressor, three chains"),
+    ("1MBN", "Myoglobin", "Sperm whale, an early 3D protein model"),
+    ("4INS", "Insulin", "Hormone made of A and B chains"),
+    ("1AOI", "Nucleosome", "Histones that package DNA"),
 )
+EXAMPLES_PER_ROW = 4
 
 METRIC_HELP = {
     "length": "Modelled residues of the selected chain that are standard amino acids.",
@@ -128,11 +137,13 @@ def render_landing() -> None:
         "3D, and inspect its sequence composition and hydrophobicity. Search in the sidebar or "
         "start with an example:"
     )
-    for column, (pdb_id, name, blurb) in zip(st.columns(len(EXAMPLES)), EXAMPLES, strict=True):
-        with column, st.container(border=True, height=170):
-            st.markdown(f"**{name}**")
-            st.caption(blurb)
-            st.button(pdb_id, key=f"example_{pdb_id}", on_click=select_entry, args=(pdb_id,))
+    for start in range(0, len(EXAMPLES), EXAMPLES_PER_ROW):
+        row = EXAMPLES[start : start + EXAMPLES_PER_ROW]
+        for column, (pdb_id, name, blurb) in zip(st.columns(EXAMPLES_PER_ROW), row, strict=False):
+            with column, st.container(border=True, height=170):
+                st.markdown(f"**{name}**")
+                st.caption(blurb)
+                st.button(pdb_id, key=f"example_{pdb_id}", on_click=select_entry, args=(pdb_id,))
 
 
 def render_header(entry: EntryMetadata) -> None:

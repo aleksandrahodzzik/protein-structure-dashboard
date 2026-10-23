@@ -8,7 +8,12 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from protein_dashboard import app
-from protein_dashboard.rcsb_client import EntryMetadata, EntryNotFoundError, RcsbUnavailableError
+from protein_dashboard.rcsb_client import (
+    EntryMetadata,
+    EntryNotFoundError,
+    RcsbUnavailableError,
+    is_valid_pdb_id,
+)
 
 ROOT = Path(__file__).parents[1]
 UBIQUITIN_CIF = (ROOT / "tests" / "data" / "1UBQ.cif").read_text()
@@ -69,14 +74,21 @@ def metric_values(at: AppTest) -> dict[str, str]:
     return {m.label: m.value for m in at.metric}
 
 
-def test_landing_page_offers_the_four_example_entries(client: FakeClient) -> None:
+def test_landing_page_offers_every_example_entry(client: FakeClient) -> None:
     at = new_app().run()
 
     assert not at.exception
     assert at.title[0].value == "Protein Structure Dashboard"
     labels = [b.label for b in at.main.button]
-    assert labels == ["1UBQ", "4HHB", "1BL8", "6VXX"]
+    assert labels == [pdb_id for pdb_id, _, _ in app.EXAMPLES]
     assert client.calls == []  # nothing is fetched until the user chooses
+
+
+def test_example_ids_are_valid_and_unique() -> None:
+    ids = [pdb_id for pdb_id, _, _ in app.EXAMPLES]
+
+    assert len(ids) == len(set(ids))
+    assert all(is_valid_pdb_id(pdb_id) for pdb_id in ids)
 
 
 def test_entering_1ubq_renders_metadata_and_metrics(client: FakeClient) -> None:
