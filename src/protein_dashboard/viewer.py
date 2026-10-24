@@ -21,8 +21,6 @@ NEUTRAL_RGB = (245, 245, 245)
 HYDROPHOBIC_RGB = (214, 87, 29)
 UNKNOWN_COLOUR = "#bdbdbd"
 DIMMED_OPACITY = 0.25
-LIGHT_BACKGROUND = "#ffffff"
-DARK_BACKGROUND = "#0e1117"  # Streamlit's own dark page colour, so the viewer blends in
 
 
 class ColorMode(StrEnum):
@@ -37,7 +35,6 @@ class ViewerOptions:
     show_surface: bool = False
     show_ligands: bool = True
     focus_chain: str | None = None  # other chains are drawn translucent
-    dark: bool = False  # the viewer lives in an iframe, so it cannot inherit the page theme
 
 
 def is_heavy(structure: ParsedStructure) -> bool:
@@ -86,7 +83,6 @@ def build_view(
 ) -> py3Dmol.view:
     heavy = is_heavy(structure)
     view = py3Dmol.view(width="100%", height=height)
-    view.setBackgroundColor(DARK_BACKGROUND if options.dark else LIGHT_BACKGROUND)
     view.addModel(trim_mmcif(mmcif_text, backbone_only=heavy), "cif")
 
     colours = _colour_style(options, structure)

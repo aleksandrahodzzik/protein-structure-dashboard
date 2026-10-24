@@ -8,7 +8,7 @@ from datetime import timedelta
 import streamlit as st
 import streamlit.components.v1 as components
 
-from . import analysis, charts, rcsb_client, viewer
+from . import analysis, charts, rcsb_client, style, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
 from .structure import UNKNOWN_RESIDUE, ParsedStructure, StructureParseError, parse_structure
 
@@ -131,7 +131,12 @@ def render_menu() -> None:
     with st.sidebar:
         home_column, theme_column = st.columns([3, 1], vertical_alignment="center")
         home_column.button(
-            "Home", icon=":material/home:", key="home", on_click=go_home, width="stretch"
+            "Home",
+            icon=":material/home:",
+            key="home",
+            on_click=go_home,
+            width="stretch",
+            type="primary",
         )
         dark = is_dark_theme()
         theme_column.button(
@@ -148,7 +153,7 @@ def render_menu() -> None:
 
 def render_search() -> None:
     with st.sidebar:
-        st.header("Find a structure")
+        style.section("Find a structure")
         with st.form("search"):
             query = st.text_input("PDB ID or keyword", placeholder="1UBQ, or e.g. hemoglobin")
             submitted = st.form_submit_button("Search", width="stretch")
@@ -224,7 +229,7 @@ def render_controls(
     """Sidebar controls that depend on the loaded structure."""
     with st.sidebar:
         st.divider()
-        st.header("Analysis")
+        style.section("Analysis")
         chain_id = st.selectbox(
             "Chain",
             [c.chain_id for c in parsed.chains],
@@ -235,7 +240,7 @@ def render_controls(
         max_window = analysis.max_window(usable)
         window = render_window_controls(max_window)
 
-        st.header("3D view")
+        style.section("3D view")
         mode = st.selectbox("Colour by", list(viewer.ColorMode))
         surface = st.checkbox("Show surface", disabled=viewer.is_heavy(parsed))
         ligands = st.checkbox(
@@ -246,7 +251,6 @@ def render_controls(
         show_surface=surface,
         show_ligands=ligands,
         focus_chain=chain_id if len(parsed.chains) > 1 else None,
-        dark=is_dark_theme(),
     )
     return chain_id, window, options
 
@@ -304,7 +308,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
             f"Large structure ({parsed.atom_count:,} atoms). To keep the browser responsive "
             "only the backbone trace is drawn; surface and ligands are disabled."
         )
-    st.subheader("3D structure")
+    style.section("3D structure")
     view = viewer.build_view(load_structure_text(pdb_id), parsed, options, VIEWER_HEIGHT)
     viewer.show_view(view, VIEWER_HEIGHT)
     if options.color_mode is viewer.ColorMode.HYDROPHOBICITY:
@@ -312,7 +316,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
     if chain.ligand_names:
         st.caption(f"Ligands on chain {chain_id}: {', '.join(chain.ligand_names)}")
 
-    st.subheader(f"Chain {chain_id} analytics")
+    style.section(f"Chain {chain_id} analytics")
     st.caption(
         f"Observed sequence: {chain.residue_count} modelled residues in {chain.segment_count} "
         "contiguous segment(s). Residues missing from the density are not included, so this "
@@ -346,6 +350,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
 
 def main() -> None:
     st.set_page_config(page_title="Protein Structure Dashboard", layout="wide")
+    style.inject()
     st.title("Protein Structure Dashboard")
     render_menu()
     render_search()

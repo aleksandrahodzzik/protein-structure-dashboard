@@ -3,3 +3,13 @@ headless = true
 
 [browser]
 gatherUsageStats = false
+
+# Both themes are declared so the app keeps following the visitor's light/dark choice;
+# only the accent colour and corner radius are ours.
+[theme.light]
+primaryColor = "#6c5ce7"
+baseRadius = "large"
+
+[theme.dark]
+primaryColor = "#8b7cff"
+baseRadius = "large"

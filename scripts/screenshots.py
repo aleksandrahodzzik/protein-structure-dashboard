@@ -47,7 +47,7 @@ def shoot_charts(page: Page, base_url: str) -> None:
     page.get_by_role("button", name="Transmembrane preset").click()
     page.get_by_text("Kyte-Doolittle hydrophobicity (window 19)").wait_for(timeout=30_000)
     time.sleep(3)
-    top = page.get_by_role("heading", name="Chain A analytics").bounding_box()
+    top = page.get_by_text("Chain A analytics").bounding_box()
     bottom = page.get_by_role("button", name="Download metrics (CSV)").bounding_box()
     assert top and bottom
     clip = {
