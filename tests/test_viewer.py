@@ -66,6 +66,11 @@ def test_each_colour_mode_emits_its_style(
     assert expected in html.replace(" ", "")
 
 
+def test_viewer_background_follows_the_page_theme(ubiquitin: ParsedStructure) -> None:
+    assert viewer.LIGHT_BACKGROUND in html_for(ubiquitin, ViewerOptions())
+    assert viewer.DARK_BACKGROUND in html_for(ubiquitin, ViewerOptions(dark=True))
+
+
 def test_surface_is_off_by_default_and_toggles_on(ubiquitin: ParsedStructure) -> None:
     assert "addSurface" not in html_for(ubiquitin, ViewerOptions())
     assert "addSurface" in html_for(ubiquitin, ViewerOptions(show_surface=True))

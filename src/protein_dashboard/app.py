@@ -6,6 +6,7 @@ import textwrap
 from datetime import timedelta
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from . import analysis, charts, rcsb_client, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
@@ -82,6 +83,67 @@ def select_entry(pdb_id: str | None) -> None:
 
 def set_kd_window(window: int) -> None:
     st.session_state["kd_window"] = window
+
+
+def go_home() -> None:
+    st.session_state.pop("search_results", None)
+    select_entry(None)
+
+
+def is_dark_theme() -> bool:
+    return st.context.theme.get("type") == "dark"
+
+
+def request_theme_switch() -> None:
+    st.session_state["theme_target"] = "Light" if is_dark_theme() else "Dark"
+
+
+# Streamlit has no API to change the theme from Python. Its own menu does it natively
+# (every widget and chart restyles, nothing reloads), so the button presses that menu item.
+# st.context.theme only catches up on the next script run, and the 3D viewer (an iframe)
+# is coloured from it, so the script also presses the menu's own "Rerun".
+THEME_SWITCH_SCRIPT = """
+<script>
+const doc = window.parent.document;
+const menu = doc.querySelector('[data-testid="stMainMenu"]');
+const opener = menu && (menu.querySelector("button") || menu);
+const press = (id) => {
+  const item = doc.querySelector('[data-testid="' + id + '"]');
+  if (item) item.click();
+};
+if (opener) {
+  opener.click();
+  setTimeout(() => {
+    press("stMainMenuItem-theme-%s");
+    setTimeout(() => {
+      press("stMainMenuItem-rerun");
+      setTimeout(() => doc.body.dispatchEvent(
+        new KeyboardEvent("keydown", {key: "Escape", bubbles: true})), 150);
+    }, 300);
+  }, 150);
+}
+</script>
+"""
+
+
+def render_menu() -> None:
+    """Top of the sidebar: back to the example gallery, and the light/dark switch."""
+    with st.sidebar:
+        home_column, theme_column = st.columns([3, 1], vertical_alignment="center")
+        home_column.button(
+            "Home", icon=":material/home:", key="home", on_click=go_home, width="stretch"
+        )
+        dark = is_dark_theme()
+        theme_column.button(
+            ":material/light_mode:" if dark else ":material/dark_mode:",  # icon-only label
+            key="theme_toggle",
+            help="Switch to light mode" if dark else "Switch to dark mode",
+            on_click=request_theme_switch,
+            width="stretch",
+        )
+        target = st.session_state.pop("theme_target", None)
+        if target:
+            components.html(THEME_SWITCH_SCRIPT % target, height=0)
 
 
 def render_search() -> None:
@@ -184,6 +246,7 @@ def render_controls(
         show_surface=surface,
         show_ligands=ligands,
         focus_chain=chain_id if len(parsed.chains) > 1 else None,
+        dark=is_dark_theme(),
     )
     return chain_id, window, options
 
@@ -284,6 +347,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
 def main() -> None:
     st.set_page_config(page_title="Protein Structure Dashboard", layout="wide")
     st.title("Protein Structure Dashboard")
+    render_menu()
     render_search()
 
     requested = st.query_params.get("pdb")

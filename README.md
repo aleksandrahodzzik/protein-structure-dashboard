@@ -21,6 +21,7 @@ A Streamlit dashboard that fetches any entry from the [RCSB Protein Data Bank](h
 - **Per-chain analytics.** Length, average molecular weight, isoelectric point, GRAVY, instability index and aromaticity, plus a composition bar chart grouped by property class (hydrophobic, polar, charged, special).
 - **Hydrophobicity profile.** A sliding-window Kyte-Doolittle plot with an adjustable odd window (3-39) and a one-click transmembrane preset (window 19, threshold 1.6). Hover shows the residue number and amino acid.
 - **CSV export** of the metrics for the selected chain.
+- **Navigation and theme.** A menu at the top of the sidebar has a Home button (back to the 12-example gallery) and a light/dark switch. The 3D viewer's background follows the theme.
 - **Sensible handling of awkward entries.** Modified residues (e.g. selenomethionine), chains with gaps in the electron density, NMR ensembles (first model only), non-protein entries, and very large assemblies (backbone-only rendering above 50,000 atoms) are all handled and explained in the UI instead of crashing.
 
 ![Per-chain analytics: composition bars and a Kyte-Doolittle profile of KcsA (1BL8) with the transmembrane threshold](docs/img/charts.png)
@@ -109,7 +110,7 @@ make test          # pytest with coverage, no network required
 make lint          # ruff check, ruff format --check, mypy
 ```
 
-- 117 tests, about 97% line coverage, none of which touch the network.
+- 121 tests, about 97% line coverage, none of which touch the network.
 - `analysis`: ubiquitin molecular weight (≈ 8564.7 Da), composition sums to 100%, Kyte-Doolittle profile length is `L - w + 1`, invalid characters are handled, window validation.
 - `structure`: a real 1UBQ mmCIF fixture (`tests/data/1UBQ.cif`: one chain, 76 residues, expected sequence) and synthetic files for modified residues, gaps, ligands, water and multiple models.
 - `rcsb_client`: HTTP mocked with [`responses`](https://github.com/getsentry/responses): success, 404, 429 followed by success, timeouts, retry exhaustion, invalid IDs.
@@ -130,6 +131,7 @@ uv run python scripts/screenshots.py --url http://localhost:8599
 - **Observed sequences only.** The SEQRES sequence is not analysed, and Kyte-Doolittle windows slide across gaps in the observed sequence as if the residues were adjacent. Modified residues are analysed as their parent amino acid (so the mass of selenomethionine is that of methionine), and unknown residues become `X`, are excluded from the metrics, and are reported in the UI.
 - **Average molecular weight only** (monoisotopic mass is implemented in the analysis function but not exposed in the UI), and only for the protein chains; nucleic acid chains are skipped.
 - **Very large assemblies** (e.g. ribosomes) can take 20 s or more to download and render, and are drawn as backbone only.
+- **The theme switch is a workaround.** Streamlit has no Python API to change the theme, so the sidebar button runs a tiny script that presses the item in Streamlit's own menu (and its "Rerun", because `st.context.theme` only updates on the next run). It relies on that menu's internal element IDs, so it is tested against the pinned Streamlit version and does nothing, rather than breaking, if they change. The built-in menu (⋮ → Light / Dark) always works.
 - **Classic four-character PDB IDs only**; the extended `pdb_` format is not supported.
 - **Docker image is about 850 MB**; a smaller image would need dependency pruning.
 - **Next steps:** analyse SEQRES via the polymer entity API, compare chains side by side, add secondary-structure and B-factor views, precompute metrics for popular entries, and move to `st.iframe` once it is the stable embedding mechanism.

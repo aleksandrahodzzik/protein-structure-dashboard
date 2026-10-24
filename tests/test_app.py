@@ -66,7 +66,7 @@ def new_app() -> AppTest:
 
 def submit_search(at: AppTest, query: str) -> AppTest:
     at.sidebar.text_input[0].set_value(query)
-    at.sidebar.button[0].click()  # the form's submit button
+    next(b for b in at.sidebar.button if b.label == "Search").click()
     return at.run()
 
 
@@ -82,6 +82,30 @@ def test_landing_page_offers_every_example_entry(client: FakeClient) -> None:
     labels = [b.label for b in at.main.button]
     assert labels == [pdb_id for pdb_id, _, _ in app.EXAMPLES]
     assert client.calls == []  # nothing is fetched until the user chooses
+
+
+def test_home_button_returns_from_an_entry_to_the_example_gallery(client: FakeClient) -> None:
+    at = new_app()
+    at.query_params["pdb"] = "1UBQ"
+    at.run()
+    assert metric_values(at)  # an entry is open
+
+    at.sidebar.button(key="home").click()
+    at.run()
+
+    assert not at.exception
+    assert "pdb" not in at.query_params
+    assert [b.label for b in at.main.button] == [pdb_id for pdb_id, _, _ in app.EXAMPLES]
+
+
+def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> None:
+    at = new_app().run()
+
+    at.sidebar.button(key="theme_toggle").click()
+    at.run()
+
+    assert not at.exception
+    assert "theme_target" not in at.session_state  # consumed by the script that applies it
 
 
 def test_example_ids_are_valid_and_unique() -> None:
