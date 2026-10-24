@@ -17,6 +17,18 @@ CSS = """
   --accent-2: #a66cff;
   --card-border: rgba(128, 128, 128, 0.28);
   --card-fill: rgba(128, 128, 128, 0.07);
+  --card-base: color-mix(in srgb, var(--page-colour, transparent) 88%, transparent);
+}
+
+/* Animated molecule canvas (see background.py): sits above the page colour, below all content */
+[data-testid="stApp"] { isolation: isolate; }
+#molecule-background {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Page title: gradient text */
@@ -63,20 +75,22 @@ CSS = """
 
 /* Metric cards */
 [data-testid="stMetric"] {
-  background: var(--card-fill);
+  background: linear-gradient(var(--card-fill), var(--card-fill)), var(--card-base);
   border: 1px solid var(--card-border);
   border-radius: 16px;
   padding: 0.9rem 1.15rem;
+  backdrop-filter: blur(8px);  /* frosted glass over the molecules */
 }
 [data-testid="stMetricValue"] { font-weight: 700; }
 
 /* Example cards */
-[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"] {
+[class*="st-key-card_"] {
   border-radius: 18px;
-  background: var(--card-fill);
+  background: linear-gradient(var(--card-fill), var(--card-fill)), var(--card-base);
+  backdrop-filter: blur(8px);
   transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-[data-testid="stMain"] [data-testid="stVerticalBlockBorderWrapper"]:hover {
+[class*="st-key-card_"]:hover {
   transform: translateY(-3px);
   border-color: var(--accent);
   box-shadow: 0 10px 26px rgba(108, 92, 231, 0.22);

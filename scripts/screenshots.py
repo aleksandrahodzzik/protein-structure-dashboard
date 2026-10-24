@@ -64,8 +64,10 @@ def shoot_search(page: Page, base_url: str) -> None:
     page.get_by_label("PDB ID or keyword").fill("hemoglobin")
     page.get_by_role("button", name="Search").click()
     page.get_by_text("Top 10 results").wait_for(timeout=60_000)
-    # Titles load one request at a time; wait for the last result button.
-    page.locator("[data-testid=stSidebar] [data-testid=stButton]").nth(9).wait_for(timeout=60_000)
+    # Titles load one request at a time; the run is finished when Streamlit's "running"
+    # indicator is gone and nothing is left faded as stale.
+    page.locator("[data-testid=stStatusWidget]").wait_for(state="hidden", timeout=120_000)
+    page.locator("[data-stale=true]").first.wait_for(state="detached", timeout=60_000)
     time.sleep(2)
     page.screenshot(
         path=OUT_DIR / "search.png", clip={"x": 0, "y": 0, "width": 1440, "height": 900}

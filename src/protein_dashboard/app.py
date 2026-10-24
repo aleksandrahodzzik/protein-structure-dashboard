@@ -8,7 +8,7 @@ from datetime import timedelta
 import streamlit as st
 import streamlit.components.v1 as components
 
-from . import analysis, charts, rcsb_client, style, viewer
+from . import analysis, background, charts, rcsb_client, style, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
 from .structure import UNKNOWN_RESIDUE, ParsedStructure, StructureParseError, parse_structure
 
@@ -207,7 +207,7 @@ def render_landing() -> None:
     for start in range(0, len(EXAMPLES), EXAMPLES_PER_ROW):
         row = EXAMPLES[start : start + EXAMPLES_PER_ROW]
         for column, (pdb_id, name, blurb) in zip(st.columns(EXAMPLES_PER_ROW), row, strict=False):
-            with column, st.container(border=True, height=170):
+            with column, st.container(border=True, height=220, key=f"card_{pdb_id}"):
                 st.markdown(f"**{name}**")
                 st.caption(blurb)
                 st.button(pdb_id, key=f"example_{pdb_id}", on_click=select_entry, args=(pdb_id,))
@@ -351,6 +351,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
 def main() -> None:
     st.set_page_config(page_title="Protein Structure Dashboard", layout="wide")
     style.inject()
+    background.inject()
     st.title("Protein Structure Dashboard")
     render_menu()
     render_search()

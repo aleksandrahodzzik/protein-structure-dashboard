@@ -21,6 +21,7 @@ A Streamlit dashboard that fetches any entry from the [RCSB Protein Data Bank](h
 - **Per-chain analytics.** Length, average molecular weight, isoelectric point, GRAVY, instability index and aromaticity, plus a composition bar chart grouped by property class (hydrophobic, polar, charged, special).
 - **Hydrophobicity profile.** A sliding-window Kyte-Doolittle plot with an adjustable odd window (3-39) and a one-click transmembrane preset (window 19, threshold 1.6). Hover shows the residue number and amino acid.
 - **CSV export** of the metrics for the selected chain.
+- **Interactive background.** Small ball-and-stick molecules drift behind the page, are pushed away by the mouse pointer, and faint bonds reach from the pointer to nearby molecules. It is one canvas drawn by a short script (`background.py`) with no network access, and it is switched off for visitors who ask their system for reduced motion.
 - **Navigation and theme.** A menu at the top of the sidebar has a Home button (back to the 12-example gallery) and a light/dark switch. The 3D viewer's background follows the theme.
 - **Sensible handling of awkward entries.** Modified residues (e.g. selenomethionine), chains with gaps in the electron density, NMR ensembles (first model only), non-protein entries, and very large assemblies (backbone-only rendering above 50,000 atoms) are all handled and explained in the UI instead of crashing.
 
@@ -110,7 +111,7 @@ make test          # pytest with coverage, no network required
 make lint          # ruff check, ruff format --check, mypy
 ```
 
-- 121 tests, about 97% line coverage, none of which touch the network.
+- 129 tests, about 97% line coverage, none of which touch the network.
 - `analysis`: ubiquitin molecular weight (≈ 8564.7 Da), composition sums to 100%, Kyte-Doolittle profile length is `L - w + 1`, invalid characters are handled, window validation.
 - `structure`: a real 1UBQ mmCIF fixture (`tests/data/1UBQ.cif`: one chain, 76 residues, expected sequence) and synthetic files for modified residues, gaps, ligands, water and multiple models.
 - `rcsb_client`: HTTP mocked with [`responses`](https://github.com/getsentry/responses): success, 404, 429 followed by success, timeouts, retry exhaustion, invalid IDs.
