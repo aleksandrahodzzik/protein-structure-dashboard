@@ -7,12 +7,11 @@ import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
-from protein_dashboard import app
+from protein_dashboard import app, examples
 from protein_dashboard.rcsb_client import (
     EntryMetadata,
     EntryNotFoundError,
     RcsbUnavailableError,
-    is_valid_pdb_id,
 )
 
 ROOT = Path(__file__).parents[1]
@@ -80,7 +79,7 @@ def test_landing_page_offers_every_example_entry(client: FakeClient) -> None:
     assert not at.exception
     assert at.title[0].value == "Protein Structure Dashboard"
     labels = [b.label for b in at.main.button]
-    assert labels == [pdb_id for pdb_id, _, _ in app.EXAMPLES]
+    assert labels == [e.pdb_id for e in examples.ALL]
     assert client.calls == []  # nothing is fetched until the user chooses
 
 
@@ -95,7 +94,7 @@ def test_home_button_returns_from_an_entry_to_the_example_gallery(client: FakeCl
 
     assert not at.exception
     assert "pdb" not in at.query_params
-    assert [b.label for b in at.main.button] == [pdb_id for pdb_id, _, _ in app.EXAMPLES]
+    assert [b.label for b in at.main.button] == [e.pdb_id for e in examples.ALL]
 
 
 def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> None:
@@ -106,13 +105,6 @@ def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> No
 
     assert not at.exception
     assert "theme_target" not in at.session_state  # consumed by the script that applies it
-
-
-def test_example_ids_are_valid_and_unique() -> None:
-    ids = [pdb_id for pdb_id, _, _ in app.EXAMPLES]
-
-    assert len(ids) == len(set(ids))
-    assert all(is_valid_pdb_id(pdb_id) for pdb_id in ids)
 
 
 def test_entering_1ubq_renders_metadata_and_metrics(client: FakeClient) -> None:

@@ -8,27 +8,13 @@ from datetime import timedelta
 import streamlit as st
 import streamlit.components.v1 as components
 
-from . import analysis, background, charts, rcsb_client, style, viewer
+from . import analysis, background, charts, examples, rcsb_client, style, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
 from .structure import UNKNOWN_RESIDUE, ParsedStructure, StructureParseError, parse_structure
 
 CACHE_TTL = timedelta(hours=24)
 VIEWER_HEIGHT = 600
 
-EXAMPLES = (
-    ("1UBQ", "Ubiquitin", "Small, 76 residues"),
-    ("4HHB", "Hemoglobin", "Multi-chain, heme ligands"),
-    ("1BL8", "KcsA K+ channel", "Hydrophobic transmembrane region"),
-    ("6VXX", "SARS-CoV-2 spike", "Large, three chains"),
-    ("1EMA", "Green fluorescent protein", "A beta-barrel that glows green"),
-    ("1F88", "Rhodopsin", "Vision receptor, seven helices"),
-    ("4OO8", "CRISPR-Cas9", "Genome editor, 1,300 residues"),
-    ("6LU7", "SARS-CoV-2 protease", "Main protease with an inhibitor"),
-    ("1TUP", "p53 on DNA", "Tumour suppressor, three chains"),
-    ("1MBN", "Myoglobin", "Sperm whale, an early 3D protein model"),
-    ("4INS", "Insulin", "Hormone made of A and B chains"),
-    ("1AOI", "Nucleosome", "Histones that package DNA"),
-)
 EXAMPLES_PER_ROW = 4
 
 METRIC_HELP = {
@@ -202,15 +188,28 @@ def render_landing() -> None:
     st.markdown(
         "Fetch any entry from the [RCSB Protein Data Bank](https://www.rcsb.org), explore it in "
         "3D, and inspect its sequence composition and hydrophobicity. Search in the sidebar or "
-        "start with an example:"
+        f"start with one of {len(examples.ALL)} examples:"
     )
-    for start in range(0, len(EXAMPLES), EXAMPLES_PER_ROW):
-        row = EXAMPLES[start : start + EXAMPLES_PER_ROW]
-        for column, (pdb_id, name, blurb) in zip(st.columns(EXAMPLES_PER_ROW), row, strict=False):
-            with column, st.container(border=True, height=220, key=f"card_{pdb_id}"):
-                st.markdown(f"**{name}**")
-                st.caption(blurb)
-                st.button(pdb_id, key=f"example_{pdb_id}", on_click=select_entry, args=(pdb_id,))
+    for tab, category in zip(
+        st.tabs([c.name for c in examples.CATEGORIES]), examples.CATEGORIES, strict=True
+    ):
+        with tab:
+            render_example_grid(category.items)
+
+
+def render_example_grid(items: tuple[examples.Example, ...]) -> None:
+    for start in range(0, len(items), EXAMPLES_PER_ROW):
+        row = items[start : start + EXAMPLES_PER_ROW]
+        for column, item in zip(st.columns(EXAMPLES_PER_ROW), row, strict=False):
+            with column, st.container(border=True, height=220, key=f"card_{item.pdb_id}"):
+                st.markdown(f"**{item.name}**")
+                st.caption(item.blurb)
+                st.button(
+                    item.pdb_id,
+                    key=f"example_{item.pdb_id}",
+                    on_click=select_entry,
+                    args=(item.pdb_id,),
+                )
 
 
 def render_header(entry: EntryMetadata) -> None:
