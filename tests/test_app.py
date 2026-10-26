@@ -73,14 +73,29 @@ def metric_values(at: AppTest) -> dict[str, str]:
     return {m.label: m.value for m in at.metric}
 
 
-def test_landing_page_offers_every_example_entry(client: FakeClient) -> None:
+def card_labels(at: AppTest) -> list[str]:
+    return [b.label for b in at.main.button]
+
+
+def test_landing_page_starts_on_the_first_category(client: FakeClient) -> None:
     at = new_app().run()
 
     assert not at.exception
     assert at.title[0].value == "Protein Structure Dashboard"
-    labels = [b.label for b in at.main.button]
-    assert labels == [e.pdb_id for e in examples.ALL]
+    assert card_labels(at) == [e.pdb_id for e in examples.CATEGORIES[0].items]
+    assert at.pills[0].options == [c.name for c in examples.CATEGORIES]
     assert client.calls == []  # nothing is fetched until the user chooses
+
+
+def test_every_category_shows_exactly_its_own_examples(client: FakeClient) -> None:
+    at = new_app().run()
+
+    for category in examples.CATEGORIES:
+        at.pills[0].set_value(category.name)
+        at.run()
+
+        assert not at.exception, category.name
+        assert card_labels(at) == [e.pdb_id for e in category.items], category.name
 
 
 def test_home_button_returns_from_an_entry_to_the_example_gallery(client: FakeClient) -> None:
@@ -94,7 +109,7 @@ def test_home_button_returns_from_an_entry_to_the_example_gallery(client: FakeCl
 
     assert not at.exception
     assert "pdb" not in at.query_params
-    assert [b.label for b in at.main.button] == [e.pdb_id for e in examples.ALL]
+    assert card_labels(at) == [e.pdb_id for e in examples.CATEGORIES[0].items]
 
 
 def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> None:

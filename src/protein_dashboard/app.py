@@ -190,11 +190,14 @@ def render_landing() -> None:
         "3D, and inspect its sequence composition and hydrophobicity. Search in the sidebar or "
         f"start with one of {len(examples.ALL)} examples:"
     )
-    for tab, category in zip(
-        st.tabs([c.name for c in examples.CATEGORIES]), examples.CATEGORIES, strict=True
-    ):
-        with tab:
-            render_example_grid(category.items)
+    names = [c.name for c in examples.CATEGORIES]
+    # Pills wrap onto several lines (16 groups would force tabs to scroll sideways), and
+    # only the chosen group's cards are drawn. Clicking the active pill clears it.
+    chosen = st.pills(
+        "Category", names, default=names[0], key="gallery_category", label_visibility="collapsed"
+    )
+    category = next((c for c in examples.CATEGORIES if c.name == chosen), examples.CATEGORIES[0])
+    render_example_grid(category.items)
 
 
 def render_example_grid(items: tuple[examples.Example, ...]) -> None:

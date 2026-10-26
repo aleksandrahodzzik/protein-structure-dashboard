@@ -1,8 +1,9 @@
-"""The example gallery: 64 hand-picked entries in 8 themed groups.
+"""The example gallery: 128 hand-picked entries in 16 themed groups of 8.
 
 Pure data, so it is easy to extend and to test. Every ID was fetched from RCSB and parsed
-into at least one protein chain before it was added; two of them (1AON, 1RYP) are above the
-heavy-structure threshold on purpose, so the backbone-only mode has something to show.
+into at least one protein chain before it was added; a few of them (e.g. 1AON, 1RYP, 3WU2)
+are above the heavy-structure threshold on purpose, so the backbone-only mode has
+something to show.
 """
 
 from __future__ import annotations
@@ -126,6 +127,110 @@ CATEGORIES: tuple[Category, ...] = (
             Example("2FHA", "Ferritin", "Human iron-storage protein"),
             Example("1HRC", "Cytochrome c", "Horse heart electron carrier"),
             Example("1OCC", "Cytochrome c oxidase", "Bovine respiratory complex, 26 chains"),
+        ),
+    ),
+    Category(
+        "Plants & light",
+        (
+            Example("1AUS", "Rubisco", "Spinach enzyme that fixes CO2"),
+            Example("1PRC", "Photosynthetic reaction centre", "Purple bacterium, 4 chains"),
+            Example("1JB0", "Photosystem I", "Cyanobacterial complex, 12 chains"),
+            Example("1KZU", "LH2 light harvester", "A ring-shaped antenna"),
+            Example("1FNB", "Ferredoxin reductase", "Spinach, passes electrons to NADP+"),
+            Example("3WU2", "Photosystem II", "Splits water, backbone-only view"),
+            Example("3CNA", "Concanavalin A", "Jack bean lectin"),
+            Example("1PLC", "Plastocyanin", "Poplar copper electron carrier"),
+        ),
+    ),
+    Category(
+        "Metalloproteins",
+        (
+            Example("1AZU", "Azurin", "A blue copper protein"),
+            Example("2CCP", "Cytochrome c peroxidase", "Yeast heme enzyme"),
+            Example("1DGF", "Catalase", "Human, breaks down hydrogen peroxide"),
+            Example("2SOD", "Superoxide dismutase", "Bovine Cu,Zn enzyme"),
+            Example("1RB9", "Rubredoxin", "Iron-sulfur protein at 0.92 Å"),
+            Example("1N2C", "Nitrogenase complex", "Fixes atmospheric nitrogen"),
+            Example("1YCC", "Yeast cytochrome c", "Iso-1, 108 residues"),
+            Example("1CYO", "Cytochrome b5", "Bovine heme-binding protein"),
+        ),
+    ),
+    Category(
+        "Brain & disease",
+        (
+            Example("2BEG", "Amyloid-beta fibril", "Alzheimer's Abeta(1-42), NMR"),
+            Example("1QLX", "Human prion protein", "Folded domain, NMR"),
+            Example("2N0A", "Alpha-synuclein fibril", "Linked to Parkinson's disease"),
+            Example("5O3L", "Tau filament", "Paired helical filament, Alzheimer's brain"),
+            Example("1FKN", "BACE1", "Beta-secretase with an inhibitor"),
+            Example("1I9B", "AChBP", "Snail acetylcholine-binding protein"),
+            Example("3KG2", "AMPA receptor", "Rat glutamate receptor"),
+            Example("4M48", "Dopamine transporter", "Fly transporter with an antidepressant"),
+        ),
+    ),
+    Category(
+        "Cancer targets",
+        (
+            Example("1YCR", "MDM2 + p53 peptide", "A target for restoring p53"),
+            Example("1G5M", "Bcl-2", "Protein that blocks cell death"),
+            Example("1IEP", "Abl kinase + imatinib", "The Gleevec target"),
+            Example("1UWH", "B-Raf + sorafenib", "Kinase with a bound drug"),
+            Example("1ERE", "Estrogen receptor", "Ligand-binding domain with estradiol"),
+            Example("1YET", "HSP90", "Bound to geldanamycin"),
+            Example("4OBE", "KRAS", "GDP-bound human KRas"),
+            Example("1N8Z", "HER2 + Herceptin", "Antibody drug bound to HER2"),
+        ),
+    ),
+    Category(
+        "Hormones & cytokines",
+        (
+            Example("3HHR", "Growth hormone + receptor", "Hormone gripped by its receptor"),
+            Example("1EER", "Erythropoietin + receptor", "Red blood cell signal"),
+            Example("1M47", "Interleukin-2", "Human T-cell cytokine"),
+            Example("1TNF", "TNF-alpha", "Inflammation signal, a trimer"),
+            Example("1BET", "Nerve growth factor", "Mouse beta-NGF"),
+            Example("1AX8", "Leptin", "Human obesity protein"),
+            Example("4ZXB", "Insulin receptor", "Ectodomain in a complex"),
+            Example("1ITF", "Interferon alpha-2a", "Antiviral cytokine, NMR"),
+        ),
+    ),
+    Category(
+        "Cytoskeleton",
+        (
+            Example("1JFF", "Tubulin", "Alpha-beta dimer with taxol"),
+            Example("2MYS", "Myosin S1", "The muscle motor head"),
+            Example("1TIT", "Titin Ig domain", "Part of the giant muscle spring"),
+            Example("1CAG", "Collagen-like peptide", "A triple helix"),
+            Example("1SA0", "Tubulin + colchicine", "A drug bound to tubulin"),
+            Example("1C1G", "Tropomyosin", "Coiled coil along actin filaments"),
+            Example("1AJ3", "Spectrin repeat", "A three-helix bundle, NMR"),
+            Example("3VKG", "Dynein motor domain", "Huge, about 2,900 residues"),
+        ),
+    ),
+    Category(
+        "Folding & design",
+        (
+            Example("1L2Y", "Trp-cage", "A 20-residue mini-protein"),
+            Example("1PGA", "Protein G B1 domain", "A folding model, 56 residues"),
+            Example("1BDD", "Protein A domain", "Three-helix bundle, 60 residues"),
+            Example("1A2P", "Barnase", "Bacterial ribonuclease"),
+            Example("2CI2", "Chymotrypsin inhibitor 2", "Barley, a classic folding model"),
+            Example("1QYS", "Top7", "A computationally designed protein"),
+            Example("1SHG", "SH3 domain", "A small signalling module"),
+            Example("1VII", "Villin headpiece", "36 residues, a fast folder"),
+        ),
+    ),
+    Category(
+        "Toxins & venoms",
+        (
+            Example("7AHL", "Alpha-hemolysin", "A pore built from seven chains"),
+            Example("3BTA", "Botulinum neurotoxin A", "Neurotoxin, 1,277 residues"),
+            Example("1XTC", "Cholera toxin", "Multi-chain bacterial toxin"),
+            Example("1DDT", "Diphtheria toxin", "Shuts down protein synthesis"),
+            Example("1ACC", "Anthrax protective antigen", "The toxin's delivery protein"),
+            Example("1HC9", "alpha-Bungarotoxin", "Snake toxin with a peptide"),
+            Example("2AAI", "Ricin", "Plant toxin, two chains"),
+            Example("1OMN", "Conotoxin MVIIC", "Cone snail peptide, 26 residues"),
         ),
     ),
 )

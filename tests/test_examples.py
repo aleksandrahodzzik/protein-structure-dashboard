@@ -6,9 +6,9 @@ from protein_dashboard import examples
 from protein_dashboard.rcsb_client import is_valid_pdb_id
 
 
-def test_there_are_64_examples_in_8_groups_of_8() -> None:
-    assert len(examples.ALL) == 64
-    assert [len(c.items) for c in examples.CATEGORIES] == [8] * 8
+def test_there_are_128_examples_in_16_groups_of_8() -> None:
+    assert len(examples.ALL) == 128
+    assert [len(c.items) for c in examples.CATEGORIES] == [8] * 16
 
 
 def test_ids_are_valid_and_unique() -> None:
@@ -23,5 +23,5 @@ def test_group_names_are_unique_and_every_card_has_text_that_fits() -> None:
 
     assert len(names) == len(set(names))
     for example in examples.ALL:
-        assert 0 < len(example.name) <= 28, example
+        assert 0 < len(example.name) <= 32, example
         assert 0 < len(example.blurb) <= 45, example

@@ -16,7 +16,7 @@ A Streamlit dashboard that fetches any entry from the [RCSB Protein Data Bank](h
 
 ## Features
 
-- **64 curated examples in 8 tabs** (classics, membrane proteins, enzymes, signalling, immune, DNA and RNA, viruses, molecular machines), each checked against the live RCSB API. Two of them are large enough to trigger the backbone-only mode on purpose.
+- **128 curated examples in 16 categories** (classics, membrane, enzymes, signalling, immune, DNA and RNA, viruses, machines, plants and light, metalloproteins, brain and disease, cancer targets, hormones, cytoskeleton, folding and design, toxins), picked from a pill selector and each checked against the live RCSB API. Three of them are large enough to trigger the backbone-only mode on purpose.
 - **Search by PDB ID or keyword.** An ID such as `1UBQ` opens the entry directly. Free text such as `hemoglobin` runs an RCSB full-text search and lists the top hits. The selected entry is kept in the URL (`?pdb=1UBQ`), so every view is linkable.
 - **Interactive 3D viewer.** Cartoon rendering with three colouring modes: by chain, N→C spectrum, and per-residue Kyte-Doolittle hydrophobicity. It also offers an optional solvent-accessible surface, ligands as sticks, and dimming of the chains you are not analysing.
 - **Per-chain analytics.** Length, average molecular weight, isoelectric point, GRAVY, instability index and aromaticity, plus a composition bar chart grouped by property class (hydrophobic, polar, charged, special).
@@ -112,7 +112,7 @@ make test          # pytest with coverage, no network required
 make lint          # ruff check, ruff format --check, mypy
 ```
 
-- 131 tests, about 97% line coverage, none of which touch the network.
+- 132 tests, about 97% line coverage, none of which touch the network.
 - `analysis`: ubiquitin molecular weight (≈ 8564.7 Da), composition sums to 100%, Kyte-Doolittle profile length is `L - w + 1`, invalid characters are handled, window validation.
 - `structure`: a real 1UBQ mmCIF fixture (`tests/data/1UBQ.cif`: one chain, 76 residues, expected sequence) and synthetic files for modified residues, gaps, ligands, water and multiple models.
 - `rcsb_client`: HTTP mocked with [`responses`](https://github.com/getsentry/responses): success, 404, 429 followed by success, timeouts, retry exhaustion, invalid IDs.
