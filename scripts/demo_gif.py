@@ -126,7 +126,7 @@ def flash_start_marker(page: Page) -> None:
           document.body.append(cover);
         }"""
     )
-    time.sleep(0.6)
+    time.sleep(1.0)  # at 0.6 s the recording sometimes missed it
     page.evaluate("document.getElementById('gif-start-marker').remove()")
 
 
@@ -150,7 +150,9 @@ def record(url: str, video_dir: Path) -> Path:
         time.sleep(0.8)
         search_and_open(page, typing_delay=70)
         colour_by_hydrophobicity(page)
-        page.locator("[data-testid=stMain] iframe").first.screenshot()  # wake WebGL frames
+        # Wake the WebGL frames. A whole-page screenshot, because an element screenshot
+        # leaks into the video as a few frames of that element alone on grey.
+        page.screenshot()
         time.sleep(1.0)
         rotate_molecule(page)
         time.sleep(0.5)
