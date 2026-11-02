@@ -39,6 +39,30 @@ def test_kd_chart_draws_threshold_line() -> None:
     assert line.y0 == line.y1 == 1.6
 
 
+def test_kd_chart_breaks_the_line_at_gaps() -> None:
+    # Residues 1-10 and 21-30 are modelled; 11-20 are missing from the density.
+    sequence = "L" * 10 + "K" * 10
+    numbers = [*range(1, 11), *range(21, 31)]
+    profile = analysis.kd_profile(sequence, 3, breaks=[9])
+
+    trace = charts.kd_profile_chart(profile, numbers, sequence).data[0]
+
+    gap = list(trace.y).index(None)
+    assert list(trace.x[:gap]) == list(range(2, 10))
+    assert trace.x[gap] is None  # Plotly leaves a hole in the line instead of joining 9 to 22
+    assert list(trace.x[gap + 1 :]) == list(range(22, 30))
+    assert trace.connectgaps is False
+
+
+def test_kd_chart_shades_missing_residues() -> None:
+    profile = analysis.kd_profile(UBIQUITIN, 9)
+
+    fig = charts.kd_profile_chart(profile, list(range(1, 77)), UBIQUITIN, missing=[(-5, 0)])
+
+    bands = [s for s in fig.layout.shapes if s.type == "rect"]
+    assert [(b.x0, b.x1) for b in bands] == [(-5.5, 0.5)]  # covers whole residue slots
+
+
 def test_kd_chart_rejects_misaligned_inputs() -> None:
     profile = analysis.kd_profile(UBIQUITIN, 9)
 

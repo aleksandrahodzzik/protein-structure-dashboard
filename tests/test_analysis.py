@@ -85,6 +85,61 @@ def test_kd_profile_rejects_window_longer_than_sequence() -> None:
         analysis.kd_profile("MKV", 9)
 
 
+def test_contiguous_runs_end_at_breaks_and_at_non_standard_residues() -> None:
+    # Break after index 2 (a gap in the density) and an unknown residue at index 6.
+    assert analysis.contiguous_runs("ACDEFGXHIK", breaks=[2]) == [(0, 3), (3, 6), (7, 10)]
+    assert analysis.contiguous_runs("XX") == []
+    assert analysis.contiguous_runs("ACD", breaks=[2]) == [(0, 3)]  # a break after the end
+
+
+def test_longest_run() -> None:
+    assert analysis.longest_run("ACDEFGXHIK", breaks=[2]) == 3
+    assert analysis.longest_run(UBIQUITIN) == 76
+    assert analysis.longest_run("XXX") == 0
+
+
+def test_kd_profile_windows_never_span_a_gap() -> None:
+    # Ten leucines, a gap, ten lysines: a window across the gap would average the two.
+    sequence = "L" * 10 + "K" * 10
+    profile = analysis.kd_profile(sequence, 3, breaks=[9])
+
+    assert profile.positions == [*range(2, 10), *range(12, 20)]
+    # No window mixes residues across the gap: every value is pure leucine or pure lysine.
+    assert profile.values == pytest.approx([3.8] * 8 + [-3.9] * 8)
+
+
+def test_kd_profile_windows_never_contain_a_non_standard_residue() -> None:
+    profile = analysis.kd_profile("LLLLXLLLL", 3)
+
+    assert profile.positions == [2, 3, 7, 8]  # positions still index the full sequence
+    assert profile.values == pytest.approx([3.8] * 4)
+
+
+def test_kd_profile_skips_stretches_shorter_than_the_window() -> None:
+    profile = analysis.kd_profile("LLLLL" + "KK", 3, breaks=[4])
+
+    assert profile.positions == [2, 3, 4]
+
+
+def test_kd_profile_rejects_window_longer_than_every_gap_free_stretch() -> None:
+    with pytest.raises(ValueError, match="longer than the longest gap-free stretch \\(5"):
+        analysis.kd_profile("L" * 10, 7, breaks=[4])
+
+
+def test_kd_profile_of_unknown_residues_only_raises() -> None:
+    with pytest.raises(ValueError, match="no standard"):
+        analysis.kd_profile("XXXXX", 3)
+
+
+def test_kd_profile_of_a_single_stretch_matches_biopython() -> None:
+    from Bio.SeqUtils.ProtParam import ProteinAnalysis
+    from Bio.SeqUtils.ProtParamData import kd
+
+    profile = analysis.kd_profile(UBIQUITIN, 9)
+
+    assert profile.values == pytest.approx(ProteinAnalysis(UBIQUITIN).protein_scale(kd, 9))
+
+
 @pytest.mark.parametrize(
     ("length", "expected"),
     [(0, 0), (2, 0), (3, 3), (4, 3), (8, 7), (19, 19), (38, 37), (39, 39), (5000, 39)],
