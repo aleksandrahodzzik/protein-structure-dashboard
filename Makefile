@@ -1,7 +1,7 @@
 IMAGE ?= protein-structure-dashboard
 PORT ?= 8501
 
-.PHONY: run test lint format requirements docker-build docker-run
+.PHONY: run test lint format requirements pages docker-build docker-run
 
 run:  ## start the app locally on http://localhost:8501
 	uv run streamlit run streamlit_app.py
@@ -21,6 +21,9 @@ format:  ## auto-fix lint issues and reformat
 requirements:  ## regenerate requirements.txt for Streamlit Community Cloud
 	uv export --frozen --no-dev --no-hashes --no-emit-project -o requirements.txt
 	echo "-e ." >> requirements.txt
+
+pages:  ## build the in-browser (stlite) version into _site/, as GitHub Pages serves it
+	uv run python scripts/build_pages.py
 
 docker-build:
 	docker build -t $(IMAGE) .
