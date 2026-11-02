@@ -115,7 +115,7 @@ make test          # pytest with coverage, no network required
 make lint          # ruff check, ruff format --check, mypy
 ```
 
-- 161 tests, about 98% line coverage, none of which touch the network.
+- 162 tests, about 98% line coverage, none of which touch the network.
 - `analysis`: ubiquitin molecular weight (≈ 8564.7 Da), composition sums to 100%, Kyte-Doolittle profile length is `L - w + 1` and matches Biopython on a gap-free chain, no window spans a gap or an `X`, invalid characters are handled, window validation.
 - `structure`: a real 1UBQ mmCIF fixture (`tests/data/1UBQ.cif`: one chain, 76 residues, expected sequence, SEQRES fully modelled) and synthetic files for modified residues, gaps, Cα-only models, ligands, water, multiple models, and SEQRES with missing, mismatched, heterogeneous and unmatched residues.
 - `rcsb_client`: HTTP mocked with [`responses`](https://github.com/getsentry/responses): success, 404, 429 followed by success, timeouts, retry exhaustion, invalid IDs.
