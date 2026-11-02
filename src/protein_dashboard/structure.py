@@ -325,6 +325,8 @@ def _seqres_by_chain(mmcif_text: str) -> dict[str, tuple[SeqresResidue, ...]]:
         insertion_codes = table.get(f"{SEQRES_CATEGORY}.pdb_ins_code", ["."] * len(columns[0]))
     except (KeyError, ValueError):  # malformed or incomplete: carry on without SEQRES
         return {}
+    if len({len(column) for column in [*columns, insertion_codes]}) != 1:
+        return {}  # a broken loop with ragged columns: no SEQRES rather than no structure
 
     positions: dict[str, dict[tuple[str, str], tuple[int, str, list[str]]]] = {}
     for (strand, asym, seq_id, name, number), code in zip(

@@ -144,6 +144,19 @@ def test_malformed_seqres_block_is_ignored() -> None:
     assert chain.chain("A").seqres == ()
 
 
+def test_seqres_loop_with_a_missing_value_does_not_break_parsing() -> None:
+    text = build_mmcif([residue("ALA")]) + poly_seq_scheme([("A", 1, "ALA"), ("A", 2, "GLY")])
+    # Make pdb_ins_code the last column, then drop its value from the last row: the
+    # column ends up one value short of the others.
+    text = text.replace("_pdbx_poly_seq_scheme.hetero\n", "").replace(" . n\n", " .\n")
+    text = text.replace("A .\n#", "A\n#")
+
+    parsed = parse_structure(text, "T")
+
+    assert parsed.chain("A").sequence == "A"
+    assert parsed.chain("A").seqres == ()
+
+
 def test_seqres_is_read_per_author_chain(ubiquitin: structure.ParsedStructure) -> None:
     seqres = ubiquitin.chain("A").seqres
 
