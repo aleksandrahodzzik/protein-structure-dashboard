@@ -1,12 +1,14 @@
 """Smoke tests: drive the real Streamlit script with a fake RCSB client (no network)."""
 
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
+from helpers import build_mmcif, poly_seq_scheme, residue
 from protein_dashboard import app, examples
 from protein_dashboard.rcsb_client import (
     EntryMetadata,
@@ -27,23 +29,51 @@ UBIQUITIN = EntryMetadata(
 )
 
 
+# A synthetic chain with every way the observed sequence can differ from SEQRES:
+# residues 13-20 are missing (a gap), residue 32 is LYS where SEQRES says ARG, and
+# residue 99 is modelled but has no SEQRES position.
+GAPPED_NUMBERS = [*range(1, 13), *range(21, 33), 99]
+GAPPED_CIF = build_mmcif(
+    [residue(name) for name in ["LEU"] * 12 + ["LYS"] * 12 + ["SER"]],
+    gaps_after=frozenset({12}),
+    numbering=GAPPED_NUMBERS,
+) + poly_seq_scheme(
+    [("A", n, "LEU") for n in range(1, 13)]
+    + [("A", n, "GLY") for n in range(13, 21)]
+    + [("A", n, "LYS") for n in range(21, 32)]
+    + [("A", 32, "ARG")]
+)
+NO_SEQRES_CIF = build_mmcif([residue("LEU")] * 10)
+
+
+def synthetic_entry(pdb_id: str) -> EntryMetadata:
+    return replace(UBIQUITIN, pdb_id=pdb_id, title=f"SYNTHETIC {pdb_id}", atom_count=None)
+
+
+ENTRIES = {
+    "1UBQ": (UBIQUITIN, UBIQUITIN_CIF),
+    "2GAP": (synthetic_entry("2GAP"), GAPPED_CIF),
+    "3NOS": (synthetic_entry("3NOS"), NO_SEQRES_CIF),
+}
+
+
 class FakeClient:
-    """Stands in for RcsbClient; only 1UBQ exists, everything else is unknown."""
+    """Stands in for RcsbClient; only ENTRIES exist, everything else is unknown."""
 
     def __init__(self) -> None:
         self.calls: list[str] = []
 
     def fetch_entry(self, pdb_id: str, *, with_organisms: bool = True) -> EntryMetadata:
         self.calls.append(f"entry:{pdb_id}")
-        if pdb_id != "1UBQ":
+        if pdb_id not in ENTRIES:
             raise EntryNotFoundError(f"RCSB has no entry for '{pdb_id}'.")
-        return UBIQUITIN
+        return ENTRIES[pdb_id][0]
 
     def fetch_structure(self, pdb_id: str) -> str:
         self.calls.append(f"structure:{pdb_id}")
-        if pdb_id != "1UBQ":
+        if pdb_id not in ENTRIES:
             raise EntryNotFoundError(f"RCSB has no entry for '{pdb_id}'.")
-        return UBIQUITIN_CIF
+        return ENTRIES[pdb_id][1]
 
     def search(self, query: str, limit: int = 10) -> list[str]:
         self.calls.append(f"search:{query}")
@@ -120,6 +150,62 @@ def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> No
 
     assert not at.exception
     assert "theme_target" not in at.session_state  # consumed by the script that applies it
+
+
+def open_entry(pdb_id: str) -> AppTest:
+    at = new_app()
+    at.query_params["pdb"] = pdb_id
+    return at.run()
+
+
+def captions(at: AppTest) -> str:
+    return "\n".join(c.value for c in at.caption)
+
+
+def test_observed_sequence_matches_seqres_for_1ubq(client: FakeClient) -> None:
+    at = open_entry("1UBQ")
+
+    assert not at.exception
+    assert "76 of 76 SEQRES residues are modelled (100%), in 1 contiguous segment." in captions(at)
+    assert "Not modelled" not in captions(at)
+    assert "line breaks" not in captions(at)  # nothing to explain under the profile
+
+
+def test_differences_from_seqres_are_shown(client: FakeClient) -> None:
+    at = open_entry("2GAP")
+
+    assert not at.exception
+    text = captions(at)
+    assert "24 of 32 SEQRES residues are modelled (75%), in 2 contiguous segments" in text
+    assert "Not modelled (8 residues): 13\u201320." in text
+    assert at.warning[0].value == (
+        "1 modelled residue(s) differ from SEQRES: 32 (ARG in SEQRES, LYS modelled)"
+    )
+    assert "have no position in SEQRES and are still analysed: 99." in at.info[0].value
+    assert at.expander[0].label == "Observed sequence against SEQRES"
+    assert at.code[0].value.splitlines()[:2] == [
+        "SEQRES 1 LLLLLLLLLL LLGGGGGGGG KKKKKKKKKK KR",
+        "Model    LLLLLLLLLL LL-------- KKKKKKKKKK KK",
+    ]
+
+
+def test_profile_breaks_at_the_gap_and_the_window_fits_the_longest_stretch(
+    client: FakeClient,
+) -> None:
+    at = open_entry("2GAP")
+
+    # 12 residues before the gap, 13 after it (21-32 and 99): the largest odd window is 13.
+    assert at.sidebar.slider[0].max == 13
+    assert "the line breaks there" in captions(at)
+    assert "Grey bands mark SEQRES residues that are not modelled." in captions(at)
+
+
+def test_file_without_seqres_says_so(client: FakeClient) -> None:
+    at = open_entry("3NOS")
+
+    assert not at.exception
+    assert "This file has no SEQRES mapping for the chain" in captions(at)
+    assert not at.expander
 
 
 def test_entering_1ubq_renders_metadata_and_metrics(client: FakeClient) -> None:

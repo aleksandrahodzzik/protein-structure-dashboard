@@ -10,12 +10,21 @@ import streamlit.components.v1 as components
 
 from . import analysis, background, charts, examples, rcsb_client, style, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
-from .structure import UNKNOWN_RESIDUE, ParsedStructure, StructureParseError, parse_structure
+from .structure import (
+    ParsedStructure,
+    ProteinChain,
+    SeqresComparison,
+    StructureParseError,
+    compare_to_seqres,
+    parse_structure,
+)
 
 CACHE_TTL = timedelta(hours=24)
 VIEWER_HEIGHT = 600
 
 EXAMPLES_PER_ROW = 4
+# Long lists of gaps or differences are cut here; the full picture is in the alignment.
+MAX_LISTED = 12
 
 METRIC_HELP = {
     "length": "Modelled residues of the selected chain that are standard amino acids.",
@@ -238,8 +247,9 @@ def render_controls(
             format_func=lambda cid: f"{cid} ({parsed.chain(cid).residue_count} residues)",
             key=f"chain_{pdb_id}",
         )
-        usable = parsed.chain(chain_id).residue_count - parsed.chain(chain_id).unknown_count
-        max_window = analysis.max_window(usable)
+        chain = parsed.chain(chain_id)
+        # Windows never cross a gap, so the longest gap-free stretch caps the window.
+        max_window = analysis.max_window(analysis.longest_run(chain.sequence, chain.breaks))
         window = render_window_controls(max_window)
 
         style.section("3D view")
@@ -259,7 +269,7 @@ def render_controls(
 
 def render_window_controls(max_window: int) -> int | None:
     if max_window == 0:
-        st.caption("Chain too short for a hydrophobicity profile.")
+        st.caption("No gap-free stretch of this chain is long enough for a hydrophobicity profile.")
         return None
     if max_window == analysis.MIN_WINDOW:
         return max_window
@@ -300,6 +310,82 @@ def render_metrics(metrics: analysis.ProteinMetrics) -> None:
     )
 
 
+def listed(items: list[str]) -> str:
+    """Comma-separated, with the tail counted instead of listed."""
+    shown = ", ".join(items[:MAX_LISTED])
+    return shown if len(items) <= MAX_LISTED else f"{shown} and {len(items) - MAX_LISTED} more"
+
+
+def render_sequence_coverage(chain: ProteinChain) -> SeqresComparison | None:
+    """Say which residues are analysed, and where they differ from the deposited sequence."""
+    segments = f"{chain.segment_count} contiguous segment{'s' * (chain.segment_count != 1)}"
+    comparison = compare_to_seqres(chain)
+    if comparison is None:
+        st.caption(
+            f"Observed sequence: {chain.residue_count} modelled residues in {segments}. "
+            "This file has no SEQRES mapping for the chain, so residues missing from the "
+            "density cannot be listed."
+        )
+        return None
+
+    st.caption(
+        f"Observed sequence: {comparison.modelled_count:,} of {comparison.seqres_length:,} "
+        f"SEQRES residues are modelled ({comparison.modelled_count / comparison.seqres_length:.0%})"
+        f", in {segments}. All metrics and the profile use the modelled residues only."
+    )
+    if comparison.missing:
+        st.caption(
+            f"Not modelled ({comparison.missing_count:,} residues): "
+            f"{listed([m.label for m in comparison.missing])}."
+        )
+    if comparison.mismatches:
+        st.warning(
+            f"{len(comparison.mismatches)} modelled residue(s) differ from SEQRES: "
+            + listed(
+                [
+                    f"{m.label} ({m.seqres_name} in SEQRES, {m.modelled_name} modelled)"
+                    for m in comparison.mismatches
+                ]
+            )
+        )
+    if comparison.unmatched:
+        st.info(
+            f"{len(comparison.unmatched)} modelled residue(s) have no position in SEQRES and are "
+            f"still analysed: {listed([r.label for r in comparison.unmatched])}."
+        )
+    with st.expander("Observed sequence against SEQRES"):
+        st.code(comparison.alignment(), language=None)
+        st.caption(
+            "SEQRES: the deposited sequence; each row starts with the author number of its "
+            "first residue. Model: the residues with coordinates; - marks a residue that is "
+            "missing from the density."
+        )
+    return comparison
+
+
+def render_kd_profile(
+    chain: ProteinChain, window: int, comparison: SeqresComparison | None
+) -> None:
+    profile = analysis.kd_profile(chain.sequence, window, breaks=chain.breaks)
+    missing = [(m.first.number, m.last.number) for m in comparison.missing] if comparison else []
+    st.plotly_chart(
+        charts.kd_profile_chart(
+            profile, [r.number for r in chain.residues], chain.sequence, missing=missing
+        ),
+        key="kd_profile",
+    )
+    notes = []
+    if len(analysis.contiguous_runs(chain.sequence, chain.breaks)) > 1:
+        notes.append(
+            "A window never spans a gap or a non-standard residue, so the line breaks there "
+            "and stretches shorter than the window have no points."
+        )
+    if missing:
+        notes.append("Grey bands mark SEQRES residues that are not modelled.")
+    if notes:
+        st.caption(" ".join(notes))
+
+
 def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> None:
     render_header(entry)
     chain_id, window, options = render_controls(pdb_id, parsed)
@@ -319,11 +405,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
         st.caption(f"Ligands on chain {chain_id}: {', '.join(chain.ligand_names)}")
 
     style.section(f"Chain {chain_id} analytics")
-    st.caption(
-        f"Observed sequence: {chain.residue_count} modelled residues in {chain.segment_count} "
-        "contiguous segment(s). Residues missing from the density are not included, so this "
-        "can be shorter than the full (SEQRES) sequence."
-    )
+    comparison = render_sequence_coverage(chain)
     if chain.unknown_count:
         st.info(f"{chain.unknown_count} non-standard residue(s) (X) are excluded from the metrics.")
     try:
@@ -335,13 +417,7 @@ def render_entry(pdb_id: str, entry: EntryMetadata, parsed: ParsedStructure) -> 
     render_metrics(metrics)
     st.plotly_chart(charts.composition_chart(metrics.composition), key="composition")
     if window is not None:
-        usable = [r for r in chain.residues if r.letter != UNKNOWN_RESIDUE]
-        sequence = "".join(r.letter for r in usable)
-        profile = analysis.kd_profile(sequence, window)
-        st.plotly_chart(
-            charts.kd_profile_chart(profile, [r.number for r in usable], sequence),
-            key="kd_profile",
-        )
+        render_kd_profile(chain, window, comparison)
     st.download_button(
         "Download metrics (CSV)",
         data=analysis.metrics_to_csv(f"{pdb_id}_{chain_id}", metrics),

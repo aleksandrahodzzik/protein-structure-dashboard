@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
@@ -59,7 +60,12 @@ class CleanedSequence:
 
 @dataclass(frozen=True)
 class HydrophobicityProfile:
-    """Sliding-window Kyte-Doolittle scores; positions are 1-based window centres."""
+    """Sliding-window Kyte-Doolittle scores.
+
+    Positions are the 1-based window centres, as indices into the analysed sequence.
+    Within a gap-free stretch they are consecutive, so a jump of more than one between
+    neighbouring positions marks a gap that no window was allowed to cross.
+    """
 
     window: int
     positions: list[int]
@@ -78,13 +84,17 @@ class ProteinMetrics:
     composition: dict[str, float]
 
 
+def _normalise(sequence: str) -> str:
+    return "".join(sequence.split()).upper()
+
+
 def clean_sequence(sequence: str) -> CleanedSequence:
     """Upper-case, drop whitespace, and strip anything that is not a standard residue.
 
     Biopython raises on X, B, Z, U, ... so non-standard letters are excluded
     from every calculation and reported as a count instead of silently guessed.
     """
-    upper = "".join(sequence.split()).upper()
+    upper = _normalise(sequence)
     kept = "".join(c for c in upper if c in STANDARD_AMINO_ACIDS)
     return CleanedSequence(sequence=kept, unknown_count=len(upper) - len(kept))
 
@@ -111,26 +121,72 @@ def molecular_weight(sequence: str, *, monoisotopic: bool = False) -> float:
     return float(analyser.molecular_weight())
 
 
-def kd_profile(sequence: str, window: int = DEFAULT_WINDOW) -> HydrophobicityProfile:
+def contiguous_runs(sequence: str, breaks: Iterable[int] = ()) -> list[tuple[int, int]]:
+    """Half-open ``(start, end)`` index ranges of consecutive standard residues.
+
+    A run ends at any non-standard letter (X, B, ...) and after every index ``i`` in
+    ``breaks``, which marks a gap between residue ``i`` and ``i + 1`` (for example
+    residues missing from the electron density). Indices refer to the sequence with
+    whitespace removed.
+    """
+    letters = _normalise(sequence)
+    cuts = set(breaks)
+    runs: list[tuple[int, int]] = []
+    start: int | None = None
+    for index, letter in enumerate(letters):
+        if letter not in STANDARD_AMINO_ACIDS:
+            if start is not None:
+                runs.append((start, index))
+            start = None
+            continue
+        if start is None:
+            start = index
+        if index in cuts:
+            runs.append((start, index + 1))
+            start = None
+    if start is not None:
+        runs.append((start, len(letters)))
+    return runs
+
+
+def longest_run(sequence: str, breaks: Iterable[int] = ()) -> int:
+    """Length of the longest gap-free stretch of standard residues, 0 if there is none."""
+    return max((end - start for start, end in contiguous_runs(sequence, breaks)), default=0)
+
+
+def kd_profile(
+    sequence: str, window: int = DEFAULT_WINDOW, *, breaks: Iterable[int] = ()
+) -> HydrophobicityProfile:
     """Kyte-Doolittle hydropathy averaged over a sliding window.
 
-    The window is centred on each residue, so it must be odd. The result has
-    ``len(sequence) - window + 1`` points.
+    The window is centred on each residue, so it must be odd. A window is only scored
+    when all of its residues are standard and contiguous: it never crosses a gap listed
+    in ``breaks`` or a non-standard residue, because averaging residues that are not
+    neighbours in the chain would invent a hydrophobic or polar stretch. Each gap-free
+    stretch of length ``n`` contributes ``n - window + 1`` points, and stretches shorter
+    than the window contribute none.
     """
-    analyser, cleaned = _analyser(sequence)
+    letters = _normalise(sequence)
+    if not clean_sequence(letters).sequence:
+        raise ValueError("Sequence has no standard amino acid residues to analyse.")
     if window < 3 or window % 2 == 0:
         raise ValueError(f"Window must be an odd integer >= 3, got {window}.")
-    if window > len(cleaned.sequence):
+    runs = contiguous_runs(letters, breaks)
+    longest = max(end - start for start, end in runs)
+    if window > longest:
         raise ValueError(
-            f"Window {window} is longer than the sequence ({len(cleaned.sequence)} residues)."
+            f"Window {window} is longer than the longest gap-free stretch ({longest} residues)."
         )
-    values = [float(v) for v in analyser.protein_scale(kd, window)]
     half = window // 2
-    return HydrophobicityProfile(
-        window=window,
-        positions=[i + half + 1 for i in range(len(values))],
-        values=values,
-    )
+    positions: list[int] = []
+    values: list[float] = []
+    for start, end in runs:
+        if end - start < window:
+            continue
+        scores = ProteinAnalysis(letters[start:end]).protein_scale(kd, window)
+        positions.extend(start + half + 1 + i for i in range(len(scores)))
+        values.extend(float(v) for v in scores)
+    return HydrophobicityProfile(window=window, positions=positions, values=values)
 
 
 def max_window(length: int) -> int:

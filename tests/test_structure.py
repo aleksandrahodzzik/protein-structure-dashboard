@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from helpers import build_mmcif, residue
+from helpers import build_mmcif, poly_seq_scheme, residue
 from protein_dashboard import structure
 from protein_dashboard.structure import StructureParseError, parse_structure
 
@@ -99,6 +99,153 @@ def test_isolated_residues_between_gaps_are_kept_and_counted_as_segments() -> No
 
     assert chain.sequence == "AGKST"
     assert chain.segment_count == 3
+    assert [r.segment for r in chain.residues] == [0, 0, 1, 2, 2]
+    assert chain.breaks == (1, 2)  # gaps after the 2nd and the 3rd residue
+
+
+def test_unbroken_chain_has_no_breaks(ubiquitin: structure.ParsedStructure) -> None:
+    assert ubiquitin.chain("A").breaks == ()
+
+
+def test_ca_only_models_are_linked_by_ca_distance() -> None:
+    # Some low-resolution models have only CA atoms: there is no C-N bond to measure,
+    # so consecutive residues 3.8 A apart must still count as neighbours.
+    ca_only = [("ATOM", name, "A", ("CA",)) for name in ("ALA", "GLY", "LYS", "SER")]
+
+    chain = parse_structure(build_mmcif(ca_only, gaps_after=frozenset({2})), "T").chain("A")
+
+    assert chain.sequence == "AGKS"
+    assert chain.breaks == (1,)
+
+
+def test_residue_without_backbone_atoms_cannot_be_linked() -> None:
+    # A standard residue modelled with its side chain only: no C, N or CA to measure.
+    records = [residue("ALA"), ("ATOM", "LEU", "A", ("CB", "CG")), residue("GLY")]
+
+    chain = parse_structure(build_mmcif(records), "T").chain("A")
+
+    assert chain.sequence == "ALG"
+    assert chain.breaks == (0, 1)
+
+
+def test_seqres_rows_without_an_author_number_are_skipped() -> None:
+    text = build_mmcif([residue("ALA")]) + poly_seq_scheme([("A", 1, "ALA"), ("A", 2, "GLY")])
+
+    chain = parse_structure(text.replace(" 2 ? ? ? A . n", " ? ? ? ? A . n"), "T").chain("A")
+
+    assert [s.number for s in chain.seqres] == [1]
+
+
+def test_malformed_seqres_block_is_ignored() -> None:
+    text = build_mmcif([residue("ALA")]) + poly_seq_scheme([("A", 1, "ALA")])
+
+    chain = parse_structure(text.replace("_pdbx_poly_seq_scheme.pdb_seq_num\n", ""), "T")
+
+    assert chain.chain("A").seqres == ()
+
+
+def test_seqres_is_read_per_author_chain(ubiquitin: structure.ParsedStructure) -> None:
+    seqres = ubiquitin.chain("A").seqres
+
+    assert "".join(s.letter for s in seqres) == UBIQUITIN
+    assert (seqres[0].number, seqres[0].name) == (1, "MET")
+
+
+def test_1ubq_observed_sequence_matches_seqres(ubiquitin: structure.ParsedStructure) -> None:
+    comparison = structure.compare_to_seqres(ubiquitin.chain("A"))
+
+    assert comparison is not None
+    assert (comparison.seqres_length, comparison.modelled_count) == (76, 76)
+    assert comparison.missing == ()
+    assert comparison.mismatches == ()
+    assert comparison.unmatched == ()
+
+
+def gapped_chain(seqres_rows: list[tuple[str, int, str]]) -> structure.ProteinChain:
+    """Modelled: ALA 2, GLY 3 | gap | LYS 6. SEQRES is supplied by the test."""
+    mmcif = build_mmcif(
+        [residue("ALA"), residue("GLY"), residue("LYS")],
+        gaps_after=frozenset({2}),
+        numbering=[2, 3, 6],
+    )
+    return parse_structure(mmcif + poly_seq_scheme(seqres_rows), "T").chain("A")
+
+
+SEQRES_MAGSTK = [
+    ("A", n, name) for n, name in enumerate(["MET", "ALA", "GLY", "SER", "THR", "LYS"], 1)
+]
+
+
+def test_missing_residues_are_listed_as_stretches_in_author_numbering() -> None:
+    comparison = structure.compare_to_seqres(gapped_chain(SEQRES_MAGSTK))
+
+    assert comparison is not None
+    assert (comparison.seqres_length, comparison.modelled_count) == (6, 3)
+    assert [(m.label, m.count) for m in comparison.missing] == [("1", 1), ("4\u20135", 2)]
+    assert comparison.missing_count == 3
+    assert comparison.mismatches == ()
+
+
+def test_missing_stretch_from_a_negative_number_is_spelled_out() -> None:
+    # Expression tags are often numbered below 1 (e.g. -18 to 26 in 6VXX).
+    rows = [("A", n, "GLY") for n in (-1, 0, 1)] + [("A", 2, "ALA"), ("A", 3, "GLY")]
+
+    comparison = structure.compare_to_seqres(gapped_chain(rows))
+
+    assert comparison is not None
+    assert [m.label for m in comparison.missing] == ["-1 to 1"]
+
+
+def test_alignment_marks_missing_residues_under_the_seqres_line() -> None:
+    comparison = structure.compare_to_seqres(gapped_chain(SEQRES_MAGSTK))
+    assert comparison is not None
+
+    assert comparison.alignment(width=4, block=2) == (
+        "SEQRES 1 MA GS\nModel    -A G-\n\nSEQRES 5 TK\nModel    -K"
+    )
+
+
+def test_modelled_residue_that_differs_from_seqres_is_a_mismatch() -> None:
+    rows = [("A", 2, "ALA"), ("A", 3, "SER"), ("A", 6, "LYS")]  # SEQRES says SER at 3
+
+    comparison = structure.compare_to_seqres(gapped_chain(rows))
+
+    assert comparison is not None
+    assert [(m.label, m.seqres_name, m.modelled_name) for m in comparison.mismatches] == [
+        ("3", "SER", "GLY")
+    ]
+
+
+def test_heterogeneous_seqres_position_accepts_either_residue() -> None:
+    rows = [("A", 2, "ALA"), ("A", 3, "SER"), ("A", 3, "GLY"), ("A", 6, "LYS")]
+
+    comparison = structure.compare_to_seqres(gapped_chain(rows))
+
+    assert comparison is not None
+    assert comparison.seqres_length == 3
+    assert comparison.mismatches == ()
+
+
+def test_modelled_residue_outside_seqres_is_reported_as_unmatched() -> None:
+    rows = [("A", 2, "ALA"), ("A", 3, "GLY")]  # residue 6 is not in the deposited sequence
+
+    comparison = structure.compare_to_seqres(gapped_chain(rows))
+
+    assert comparison is not None
+    assert [r.number for r in comparison.unmatched] == [6]
+
+
+def test_seqres_of_other_chains_is_not_mixed_in() -> None:
+    rows = [("B", n, "GLY") for n in range(1, 10)]
+
+    assert structure.compare_to_seqres(gapped_chain(rows)) is None
+
+
+def test_file_without_seqres_mapping_gives_no_comparison() -> None:
+    chain = parse_structure(build_mmcif([residue("ALA"), residue("GLY")]), "T").chain("A")
+
+    assert chain.seqres == ()
+    assert structure.compare_to_seqres(chain) is None
 
 
 def test_ligands_exclude_water_and_ions_do_not_pollute_the_sequence() -> None:
