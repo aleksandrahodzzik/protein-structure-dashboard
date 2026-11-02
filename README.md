@@ -14,7 +14,7 @@ A Streamlit dashboard that fetches any entry from the [RCSB Protein Data Bank](h
 
 > The demo runs on Streamlit Community Cloud, which puts apps to sleep after a period of inactivity. If you see a "This app has gone to sleep" page, click the wake-up button and give it about 30 seconds.
 
-**[Or run it in your browser, on GitHub Pages](https://aleksandrahodzzik.github.io/protein-structure-dashboard/)**: the same app with no server at all (see [In-browser build](#in-browser-build-github-pages)). It never sleeps, but it takes 20-40 s to start while Python loads into the page.
+**[Or run it in your browser, on GitHub Pages](https://aleksandrahodzzik.github.io/protein-structure-dashboard/)**: the same app with no server at all (see [In-browser build](#in-browser-build-github-pages)). It never sleeps, but it takes 30-45 s to start while Python loads into the page.
 
 ![3D view of haemoglobin (4HHB) coloured by Kyte-Doolittle hydrophobicity, with heme groups as sticks](docs/img/3d-view.png)
 
@@ -110,7 +110,7 @@ python -m http.server -d _site 8000  # then open http://localhost:8000
 No code changes were needed, because RCSB's APIs answer the browser directly (`Access-Control-Allow-Origin: *`) and stlite patches `requests` to use the browser's own HTTP. The differences from the server version:
 
 - Streamlit is the version that stlite bundles (1.65 with stlite 1.12.0), not the one in `uv.lock`. Biopython and `requests` come from Pyodide's own distribution, while plotly and py3Dmol are pinned to `uv.lock`.
-- The first visit downloads about 40 MB (Pyodide, Streamlit and the app's packages), and every visit spends 20-40 s starting Python before the app appears.
+- The first visit downloads about 40 MB (Pyodide, Streamlit and the app's packages), and the app takes 30-45 s to appear. Later visits take a little less, since the downloads then come from the browser cache, but starting Python still takes most of that time.
 - The browser does not let a page set `User-Agent`, so RCSB sees the browser's own. `time.sleep` does nothing in Pyodide, so retries happen without the backoff.
 - Each visitor runs their own copy, so the `st.cache_data` cache lives only as long as the tab.
 
