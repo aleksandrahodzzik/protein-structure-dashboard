@@ -1,5 +1,7 @@
 # Protein Structure Dashboard
 
+[![Demo: searching for bacteriorhodopsin, opening entry 1KG8, colouring the 3D model by hydrophobicity, and the Kyte-Doolittle profile with a gap band](docs/img/demo.gif)](https://protein-structure-dashboard.streamlit.app)
+
 [![CI](https://github.com/aleksandrahodzzik/protein-structure-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/aleksandrahodzzik/protein-structure-dashboard/actions/workflows/ci.yml)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
