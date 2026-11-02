@@ -13,3 +13,4 @@ build/
 *.egg-info/
 .streamlit/secrets.toml
 .DS_Store
+_site/
