@@ -162,6 +162,55 @@ def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> No
     assert theme_scripts(at) == []  # sent once, not on every rerun
 
 
+def theme_icon(at: AppTest) -> str:
+    return at.sidebar.button(key="theme_toggle").label
+
+
+def test_theme_button_shows_the_new_theme_without_a_rerun(client: FakeClient) -> None:
+    # The menu that viewers of a deployed app get has no "Rerun", so the icon must not wait
+    # for st.context.theme to catch up (AppTest never reports a theme, i.e. light).
+    at = new_app().run()
+    assert theme_icon(at) == ":material/dark_mode:"
+
+    at.sidebar.button(key="theme_toggle").click()
+    at.run()
+
+    assert theme_icon(at) == ":material/light_mode:"
+    (script,) = theme_scripts(at)
+    assert "rerun" not in script
+
+    at.sidebar.button(key="theme_toggle").click()
+    at.run()
+
+    assert theme_icon(at) == ":material/dark_mode:"
+    (script,) = theme_scripts(at)
+    assert "stMainMenuItem-theme-Light" in script
+
+
+class FakeContext:
+    def __init__(self, theme: str | None) -> None:
+        self.theme = {"type": theme}
+
+
+def test_theme_follows_the_browser_once_it_reports_a_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state: dict[str, bool] = {}
+    monkeypatch.setattr(app.st, "session_state", state)
+    monkeypatch.setattr(app.st, "context", FakeContext("light"))
+    assert not app.is_dark_theme()
+
+    app.request_theme_switch()  # the button asked for dark, the browser still says light
+    assert app.is_dark_theme()
+    assert state["theme_target"] == "Dark"
+
+    monkeypatch.setattr(app.st, "context", FakeContext("dark"))  # the switch went through
+    assert app.is_dark_theme()
+
+    monkeypatch.setattr(app.st, "context", FakeContext("light"))  # Streamlit's own menu
+    assert not app.is_dark_theme()
+
+
 def open_entry(pdb_id: str) -> AppTest:
     at = new_app()
     at.query_params["pdb"] = pdb_id

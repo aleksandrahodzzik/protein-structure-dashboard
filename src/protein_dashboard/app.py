@@ -85,19 +85,31 @@ def go_home() -> None:
 
 
 def is_dark_theme() -> bool:
-    return st.context.theme.get("type") == "dark"
+    """The theme the page shows, counting a switch the sidebar button has just requested.
+
+    st.context.theme is the theme the browser reported when this script run started, so it
+    lags a switch by one run. The button's choice is kept until the browser reports a
+    different theme, which also picks up a switch made in Streamlit's own menu.
+    """
+    reported = st.context.theme.get("type") == "dark"
+    if st.session_state.get("theme_reported") != reported:
+        st.session_state["theme_reported"] = reported
+        st.session_state["theme_dark"] = reported
+    return bool(st.session_state["theme_dark"])
 
 
 def request_theme_switch() -> None:
-    st.session_state["theme_target"] = "Light" if is_dark_theme() else "Dark"
+    dark = not is_dark_theme()
+    st.session_state["theme_dark"] = dark
+    st.session_state["theme_target"] = "Dark" if dark else "Light"
 
 
 # Streamlit (checked up to 1.66) has no supported way to change the theme from Python:
 # st.context.theme is read-only and the theme config options cannot be set at runtime.
 # Its own menu does it natively (every widget and chart restyles, nothing reloads), so
-# the button presses that menu item. st.context.theme only catches up on the next script
-# run, and the button's sun/moon icon is chosen from it, so the script also presses the
-# menu's own "Rerun". The script runs in the page itself (st.html), like background.py.
+# the button presses that menu item. Only the theme items are used: the menu that viewers
+# of a deployed app get has no "Rerun". The script runs in the page itself (st.html),
+# like background.py.
 THEME_SWITCH_SCRIPT = """
 <script>
 (() => {
@@ -111,11 +123,8 @@ THEME_SWITCH_SCRIPT = """
   opener.click();
   setTimeout(() => {
     press("stMainMenuItem-theme-%s");
-    setTimeout(() => {
-      press("stMainMenuItem-rerun");
-      setTimeout(() => document.body.dispatchEvent(
-        new KeyboardEvent("keydown", {key: "Escape", bubbles: true})), 150);
-    }, 300);
+    setTimeout(() => document.body.dispatchEvent(
+      new KeyboardEvent("keydown", {key: "Escape", bubbles: true})), 150);
   }, 150);
 })();
 </script>
