@@ -22,7 +22,7 @@ def ubiquitin() -> ParsedStructure:
 
 
 def html_for(structure: ParsedStructure, options: ViewerOptions, text: str = CIF) -> str:
-    return build_view(text, structure, options)._make_html()
+    return build_view(text, structure, options).write_html()
 
 
 def test_kd_colour_endpoints_and_clamping() -> None:
@@ -150,15 +150,15 @@ def test_trim_rejects_text_without_atoms() -> None:
         trim_mmcif("data_X\n#\n")
 
 
-def test_show_view_renders_through_components_html(
+def test_show_view_renders_through_st_iframe(
     ubiquitin: ParsedStructure, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[tuple[str, int]] = []
-    monkeypatch.setattr(
-        viewer.components, "html", lambda html, height: calls.append((html, height))
-    )
+    calls: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(viewer.st, "iframe", lambda src, **kw: calls.append((src, kw)))
 
     viewer.show_view(build_view(CIF, ubiquitin, ViewerOptions()), height=480)
 
-    assert calls[0][1] == 480
-    assert "3dmolviewer" in calls[0][0]
+    ((src, kwargs),) = calls
+    assert "3dmolviewer" in src
+    assert kwargs["height"] == 480
+    assert kwargs["alt"]  # the frame has an accessible name for screen readers

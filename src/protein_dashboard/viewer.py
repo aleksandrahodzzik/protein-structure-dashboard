@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import py3Dmol
-import streamlit.components.v1 as components
+import streamlit as st
 
 from .analysis import residue_kd_value
 from .structure import ParsedStructure, trim_mmcif
+
+VIEWER_ALT = "Interactive 3D view of the structure"
 
 # Above this many atoms the view drops surface and ligands and loads only the backbone
 # trace; browsers choke on full-atom ribosome-sized entries.
@@ -122,6 +124,10 @@ def _polymer_names(structure: ParsedStructure) -> list[str]:
 
 
 def show_view(view: py3Dmol.view, height: int = 600) -> None:
-    """Render a built view in Streamlit. The only place that touches the renderer, so
-    swapping py3Dmol's HTML export for another component later is a one-function change."""
-    components.html(view._make_html(), height=height)
+    """Render a built view in Streamlit. The only place that touches the renderer.
+
+    py3Dmol's ``write_html()`` returns a self-contained page (3Dmol.js and the trimmed
+    model), which ``st.iframe`` embeds as-is. That HTML is built by our own code from
+    RCSB coordinates, never from user input, which is what ``st.iframe`` requires.
+    """
+    st.iframe(view.write_html(), height=height, alt=VIEWER_ALT)

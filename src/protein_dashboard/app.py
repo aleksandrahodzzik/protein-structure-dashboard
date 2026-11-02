@@ -6,7 +6,6 @@ import textwrap
 from datetime import timedelta
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from . import analysis, background, charts, examples, rcsb_client, style, viewer
 from .rcsb_client import EntryMetadata, RcsbClient, RcsbError
@@ -93,30 +92,32 @@ def request_theme_switch() -> None:
     st.session_state["theme_target"] = "Light" if is_dark_theme() else "Dark"
 
 
-# Streamlit has no API to change the theme from Python. Its own menu does it natively
-# (every widget and chart restyles, nothing reloads), so the button presses that menu item.
-# st.context.theme only catches up on the next script run, and the 3D viewer (an iframe)
-# is coloured from it, so the script also presses the menu's own "Rerun".
+# Streamlit (checked up to 1.66) has no supported way to change the theme from Python:
+# st.context.theme is read-only and the theme config options cannot be set at runtime.
+# Its own menu does it natively (every widget and chart restyles, nothing reloads), so
+# the button presses that menu item. st.context.theme only catches up on the next script
+# run, and the button's sun/moon icon is chosen from it, so the script also presses the
+# menu's own "Rerun". The script runs in the page itself (st.html), like background.py.
 THEME_SWITCH_SCRIPT = """
 <script>
-const doc = window.parent.document;
-const menu = doc.querySelector('[data-testid="stMainMenu"]');
-const opener = menu && (menu.querySelector("button") || menu);
-const press = (id) => {
-  const item = doc.querySelector('[data-testid="' + id + '"]');
-  if (item) item.click();
-};
-if (opener) {
+(() => {
+  const menu = document.querySelector('[data-testid="stMainMenu"]');
+  const opener = menu && (menu.querySelector("button") || menu);
+  const press = (id) => {
+    const item = document.querySelector('[data-testid="' + id + '"]');
+    if (item) item.click();
+  };
+  if (!opener) return;
   opener.click();
   setTimeout(() => {
     press("stMainMenuItem-theme-%s");
     setTimeout(() => {
       press("stMainMenuItem-rerun");
-      setTimeout(() => doc.body.dispatchEvent(
+      setTimeout(() => document.body.dispatchEvent(
         new KeyboardEvent("keydown", {key: "Escape", bubbles: true})), 150);
     }, 300);
   }, 150);
-}
+})();
 </script>
 """
 
@@ -143,7 +144,8 @@ def render_menu() -> None:
         )
         target = st.session_state.pop("theme_target", None)
         if target:
-            components.html(THEME_SWITCH_SCRIPT % target, height=0)
+            # A fixed script; the only substitution is "Light" or "Dark" from our own code.
+            st.html(THEME_SWITCH_SCRIPT % target, unsafe_allow_javascript=True)
 
 
 def render_search() -> None:

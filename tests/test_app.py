@@ -142,14 +142,24 @@ def test_home_button_returns_from_an_entry_to_the_example_gallery(client: FakeCl
     assert card_labels(at) == [e.pdb_id for e in examples.CATEGORIES[0].items]
 
 
+def theme_scripts(at: AppTest) -> list[str]:
+    return [h.value for h in at.html if "stMainMenuItem-theme" in h.value]
+
+
 def test_theme_button_requests_the_opposite_theme_once(client: FakeClient) -> None:
     at = new_app().run()
+    assert theme_scripts(at) == []
 
     at.sidebar.button(key="theme_toggle").click()
     at.run()
 
     assert not at.exception
     assert "theme_target" not in at.session_state  # consumed by the script that applies it
+    (script,) = theme_scripts(at)
+    assert "stMainMenuItem-theme-Dark" in script  # AppTest has no theme, i.e. light
+
+    at.run()
+    assert theme_scripts(at) == []  # sent once, not on every rerun
 
 
 def open_entry(pdb_id: str) -> AppTest:
