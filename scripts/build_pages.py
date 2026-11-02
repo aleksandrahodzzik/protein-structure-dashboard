@@ -60,7 +60,7 @@ PAGE = """<!doctype html>
   <div id="boot" aria-live="polite">
     <strong>Loading __TITLE__&hellip;</strong>
     <small>Python and the app's packages (about 40&nbsp;MB on the first visit) run
-      inside your browser, so the app takes 20&ndash;40&nbsp;s to start.</small>
+      inside your browser, so the app takes 30&ndash;45&nbsp;s to start.</small>
     <small><a href="__REPO__">Source on GitHub</a> &middot;
       <a href="__LIVE_DEMO__">Server-hosted version</a></small>
   </div>
